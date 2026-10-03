@@ -11,10 +11,11 @@ import { OllamaAdapter } from '../../providers/ollama/index.ts';
 import { CompatibleAdapter } from '../../providers/openai-compatible/index.ts';
 import { listInstalled, removeInstalled } from '../../extensions/install/index.ts';
 import { RUNTIME_FLAGS } from '../../sdk/manifest/index.ts';
-
-const booleanFlags = new Set(['json', 'probe', 'yes']);
+import { ADMIN, MANAGEMENT, managementBooleans } from './contract.ts';
+import { scalarTypes } from '../parser/index.ts';
 
 export function options(tokens: string[], allowed: string[]) {
+  // Management handlers validate heterogeneous flag values against their own schemas.
   const flags: Record<string, any> = {},
     positionals: string[] = [];
 
@@ -28,8 +29,13 @@ export function options(tokens: string[], allowed: string[]) {
       if (!allowed.includes(name) && name !== 'json' && name !== 'error-format')
         throw new RibbitError(2, `Unknown management flag --${name}`);
       if (name in flags) throw new RibbitError(2, `Duplicate management flag --${name}`);
-      if (booleanFlags.has(name)) flags[name] = true;
-      else {
+      if (managementBooleans.has(name)) {
+        const value = eq < 0 ? undefined : token.slice(eq + 1);
+
+        if (value !== undefined && !['true', 'false'].includes(value))
+          throw new RibbitError(2, `--${name} expects true or false`);
+        flags[name] = value !== 'false';
+      } else {
         const value = eq < 0 ? tokens[++i] : token.slice(eq + 1);
 
         if (value === undefined) throw new RibbitError(2, `--${name} requires a value`);
@@ -64,37 +70,18 @@ export function respond(value: unknown, json: boolean) {
   );
 }
 
-export const ADMIN = new Set([
-  'providers',
-  'profiles',
-  'models',
-  'route',
-  'commands',
-  'types',
-  'extensions',
-  'init',
-  'completions',
-  'setup',
-  'doctor',
-]);
-
 export async function admin(command: string, tokens: string[]): Promise<void> {
-  const { flags: f, positionals: p } = options(tokens, [
-    'type',
-    'base-url',
-    'default-model',
-    'api-key-env',
-    'capabilities',
-    'provider',
-    'model',
-    'profile',
-    'temperature',
-    'max-output-tokens',
-    'timeout',
-    'probe',
-    'agent',
-    'yes',
-  ]);
+  const operations = MANAGEMENT[command];
+  const { flags: f, positionals: p } = options(
+    tokens,
+    Object.values(operations).flatMap((op) => op.flags),
+  );
+  const contract = operations[p[0] ?? (operations[''] ? '' : 'list')];
+
+  if (!contract) throw new RibbitError(2, `Use ribbit ${command} --help`);
+  for (const flag of Object.keys(f))
+    if (!['json', 'error-format'].includes(flag) && !contract.flags.includes(flag))
+      throw new RibbitError(2, `Unknown management flag --${flag} for this operation`);
 
   if (f['error-format'] && !['json', 'text'].includes(f['error-format']))
     throw new RibbitError(2, 'Unknown error format');
@@ -110,8 +97,15 @@ export async function admin(command: string, tokens: string[]): Promise<void> {
     const flags = [
       ...new Set([
         ...[...RUNTIME_FLAGS].map((flag) => '--' + flag),
+        '--json',
+        '--error-format',
+        ...Object.values(MANAGEMENT).flatMap((entries) =>
+          Object.values(entries).flatMap((op) => op.flags.map((flag) => '--' + flag)),
+        ),
         ...(await types()).flatMap((m) =>
-          Object.values(m.actions).flatMap((a) => a.bindings.map((b) => '--' + b.flag)),
+          Object.values(m.actions).flatMap((a) =>
+            a.bindings.filter((b) => scalarTypes.has(b.type)).map((b) => '--' + b.flag),
+          ),
         ),
       ]),
     ].join(' ');

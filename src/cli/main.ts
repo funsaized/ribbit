@@ -1,21 +1,10 @@
 import { version } from '../../package.json';
 import { builtins } from '../catalog/index.ts';
 import { RibbitError, EXACT_LIMITS, SEMANTIC_LIMITS } from '../engine/records/index.ts';
+import { ADMIN } from './admin/contract.ts';
+import { actionHelp, managementHelp, flowHelp } from './help.ts';
 
 const argv = process.argv.slice(2);
-const administrative = [
-  'providers',
-  'profiles',
-  'models',
-  'route',
-  'commands',
-  'types',
-  'extensions',
-  'init',
-  'completions',
-  'setup',
-  'doctor',
-];
 
 function help(
   name?: string,
@@ -24,23 +13,22 @@ function help(
   defaults: Record<string, unknown> = {},
 ) {
   if (name === 'flow') {
-    console.log(
-      'Usage: ribbit flow run|plan|validate FILE [runtime flags]\n       ribbit flow run|plan|validate [runtime flags] -- COMMAND [args] :: COMMAND [args]\n\nPlan and validate check references without inference. Run executes the flow.\nUse --profile as a flow default, segment --profile to override, or --force-profile to replace all routes.',
-    );
+    console.log(flowHelp());
+
+    return;
+  }
+  if (name && ADMIN.has(name)) {
+    console.log(managementHelp(name, argv[1]?.startsWith('--') ? undefined : argv[1]));
 
     return;
   }
   if (name && manifest) {
-    const action = manifest.actions[actionName];
-
-    console.log(
-      `ribbit ${name} — ${action.description}\n\nType: ${manifest.type}\nAction: ${actionName}\nDefaults: ${JSON.stringify(defaults)}\n\n${action.bindings.map((b) => `  --${b.flag}${b.type === 'boolean' ? '' : ` <${b.type}>`}${b.repeated ? ' (repeatable)' : ''}${b.positional !== undefined ? ' (positional)' : ''}`).join('\n')}\n\nInput: ${action.inputKind}; output: ${action.outputKind}.\nRuntime: --input auto|text|lines|jsonl|records, --output records|jsonl|text|json,\n--file PATH, --profile NAME, --provider NAME, --model NAME, --stats, --error-format json.\n`,
-    );
+    console.log(actionHelp(name, manifest, actionName, defaults));
 
     return;
   }
   console.log(
-    `Ribbit — Small commands. Big hops.\n\nUsage: ribbit COMMAND [arguments]\n\nCommands:\n  ${Object.keys(builtins).join(', ')}\n\nManagement:\n  ${administrative.join(', ')}, run, flow\n\nUse ribbit COMMAND --help or ribbit types describe @ribbit/COMMAND --json.`,
+    `Ribbit — Small commands. Big hops.\n\nUsage: ribbit COMMAND [arguments]\n\nCommands:\n  ${Object.keys(builtins).join(', ')}\n\nManagement:\n  ${[...ADMIN].join(', ')}, run, flow\n\nUse ribbit COMMAND --help or ribbit types describe @ribbit/COMMAND --json.`,
   );
 }
 
@@ -56,9 +44,16 @@ async function main() {
     return;
   }
   if (argv.slice(0, argv.indexOf('--') < 0 ? undefined : argv.indexOf('--')).includes('--help')) {
+    if (argv[0] === 'run' && (!argv[1] || argv[1].startsWith('--'))) {
+      console.log(
+        'Usage: ribbit run COMMAND [arguments] [runtime flags]\nUse ribbit run COMMAND --help for its contract.',
+      );
+
+      return;
+    }
     const name = argv[0] === 'run' ? argv[1] : argv[0];
 
-    if (name && !builtins[name] && !administrative.includes(name) && name !== 'flow') {
+    if (name && !builtins[name] && !ADMIN.has(name) && name !== 'flow') {
       const invocation = await (await import('../definitions/index.ts')).resolveInvocation(name);
 
       help(name, invocation.manifest, invocation.action, invocation.args);
@@ -69,7 +64,7 @@ async function main() {
   (await import('../config/index.ts')).loadDotenv();
   const command = argv[0];
 
-  if (administrative.includes(command)) {
+  if (ADMIN.has(command)) {
     await (await import('./admin/index.ts')).admin(command, argv.slice(1));
 
     return;

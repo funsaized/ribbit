@@ -194,7 +194,12 @@ export const exactCommands = {
         if (value === a.equals) yield r;
       }
     },
-    { cli: { positionals: ['field'] } },
+    {
+      cli: { positionals: ['field'] },
+      examples: [
+        `printf '%s\\n' '{"ok":true}' '{"ok":false}' | ribbit where ok --args-json '{"equals":true}' --input jsonl --output jsonl`,
+      ],
+    },
   ),
   render: defineCommand({
     type: '@ribbit/render',

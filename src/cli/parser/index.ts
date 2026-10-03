@@ -4,8 +4,11 @@ import { RibbitError } from '../../engine/records/index.ts';
 
 export type Runtime = Record<string, string | number | boolean>;
 
-const booleans = new Set(['help', 'version', 'stats']);
-const numbers = new Set(['max-bytes', 'max-records', 'max-requests', 'max-tokens', 'total-ms', 'request-ms']);
+export const booleans = new Set(['help', 'version', 'stats']);
+
+export const numbers = new Set(['max-bytes', 'max-records', 'max-requests', 'max-tokens', 'total-ms', 'request-ms']);
+
+export const scalarTypes = new Set(['string', 'number', 'integer', 'boolean']);
 
 export function parseAction(
   tokens: string[],
@@ -22,6 +25,7 @@ export function parseAction(
     literal = false;
 
   function scalar(value: string, type: string) {
+    if (!scalarTypes.has(type)) throw new RibbitError(2, 'Complex arguments require --args-json');
     if (type === 'boolean') {
       if (!['true', 'false'].includes(value)) throw new RibbitError(2, 'Expected true or false');
 
@@ -32,8 +36,8 @@ export function parseAction(
 
       return Number(value);
     }
-    if (type === 'string') return value;
-    throw new RibbitError(2, 'Complex arguments require --args-json');
+
+    return value;
   }
 
   for (let i = 0; i < tokens.length; i++) {

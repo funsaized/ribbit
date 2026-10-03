@@ -33,6 +33,12 @@ test('catalog/help/completions/plan do not import installed code or invoke fetch
     for (const args of [
       ['--help'],
       ['echo', '--help'],
+      ['run', 'echo', '--help'],
+      ['providers', 'add', '--help'],
+      ['models', 'list', '--help'],
+      ['doctor', '--help'],
+      ['extensions', 'add', '--help'],
+      ['types', 'describe', '@audit/echo', '--json'],
       ['types', 'list', '--json'],
       ['commands', 'describe', 'echo', '--json'],
       ['route', 'inspect', 'echo', '--json'],
