@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { builtins } from '../../src/catalog/index.ts';
 import { parseAction, numbers, scalarTypes } from '../../src/cli/parser/index.ts';
 import { options } from '../../src/cli/admin/index.ts';
-import { MANAGEMENT, managementBooleans } from '../../src/cli/admin/contract.ts';
+import { ADMIN, MANAGEMENT, managementBooleans } from '../../src/cli/admin/contract.ts';
 import { actionHelp, managementHelp, runtimeHelp } from '../../src/cli/help.ts';
 import { cases, pickerCase } from '../../scripts/release/cases.ts';
 import { z, defineCommand, defineAction } from '../../src/sdk/index.ts';
@@ -86,6 +86,8 @@ test('extension help handles nested/nullable fields, repeated enums/booleans and
           args: z.strictObject({
             prompt: z.string(),
             enabled: z.boolean().default(true),
+            disabled: z.literal(false).default(false),
+            locked: z.literal(true).default(true),
             label: z.array(z.enum(['yes', 'no'])),
             bit: z.array(z.boolean()).optional(),
             nested: z.strictObject({ value: z.string() }).optional(),
@@ -108,6 +110,11 @@ test('extension help handles nested/nullable fields, repeated enums/booleans and
 
   expect(help).toContain('--prompt <string> (optional; default: "saved"; positional 1)');
   expect(help).toContain('--enabled[=true|false] (optional; default: false)');
+  expect(help).toContain('--disabled=false (optional; default: false)');
+  expect(help).toContain('--locked[=true] (optional; default: true)');
+  expect(parseAction(['saved', '--label', 'yes', '--disabled=false', '--locked'], action).args.disabled).toBe(false);
+  expect(() => parseAction(['saved', '--label', 'yes', '--disabled'], action)).toThrow();
+  expect(() => parseAction(['saved', '--label', 'yes', '--locked=false'], action)).toThrow();
   expect(help).toContain('--label <"yes"|"no"> (required; repeatable)');
   expect(help).toContain('--bit <boolean> (optional; repeatable)');
   expect(help).toContain('nested <object> via --args-json');
@@ -137,6 +144,8 @@ test('extension help handles nested/nullable fields, repeated enums/booleans and
     args: {
       prompt: 'saved',
       enabled: false,
+      disabled: false,
+      locked: true,
       label: ['yes', 'no'],
       bit: [false, true],
       nested: { value: 'ok' },
@@ -144,6 +153,83 @@ test('extension help handles nested/nullable fields, repeated enums/booleans and
     },
     runtime: { stats: false },
   });
+  for (const [values, syntax] of [
+    [[false], '=false'],
+    [[true], '[=true]'],
+    [[true, false], '[=true|false]'],
+  ] as const) {
+    const restricted = {
+      ...command,
+      actions: {
+        run: {
+          ...action,
+          args: {
+            ...action.args,
+            properties: { ...action.args.properties, enabled: { type: 'boolean', enum: values } },
+          },
+        },
+      },
+    };
+
+    expect(actionHelp('named', restricted)).toContain(`--enabled${syntax} (required)`);
+    for (const value of [true, false]) {
+      const parse = () => parseAction(['saved', '--label', 'yes', `--enabled=${value}`], restricted.actions.run);
+
+      if (values.some((allowed) => allowed === value)) expect(parse().args.enabled).toBe(value);
+      else expect(parse).toThrow();
+    }
+  }
+});
+
+test('help suppresses positional slots blocked by complex or repeated arguments', () => {
+  const config = z.strictObject({});
+
+  for (const middle of [z.strictObject({ value: z.string() }), z.array(z.string())]) {
+    const command = manifest(
+      defineCommand({
+        type: '@test/positionals',
+        version: '1.0.0',
+        description: 'positionals',
+        config,
+        actions: {
+          run: defineAction({
+            config,
+            description: 'positionals',
+            args: z.strictObject({ first: z.string(), middle, last: z.string() }),
+            input: z.string(),
+            output: z.string(),
+            mode: 'value',
+            capabilities: [],
+            effects: [],
+            cli: { positionals: ['first', 'middle', 'last'] },
+            execute: ({ input }) => input,
+          }),
+        },
+      }),
+      hash('positionals'),
+    );
+    const help = actionHelp('positionals', command);
+    const action = command.actions.run;
+    const value = middle instanceof z.ZodArray ? ['one', 'two'] : { value: 'saved' };
+    const json = JSON.stringify({ middle: value });
+
+    expect(help).toContain('--first <string> (required; positional 1)');
+    expect(help).toContain('--last <string> (required)');
+    expect(help).not.toContain('positional 3');
+    expect(parseAction(['first', '--args-json', json, '--last', 'last'], action).args).toEqual({
+      first: 'first',
+      middle: value,
+      last: 'last',
+    });
+    expect(() => parseAction(['first', '--args-json', json, 'last'], action)).toThrow();
+    expect(
+      parseAction(['--args-json', JSON.stringify({ first: 'first', middle: value, last: 'last' })], action).args.last,
+    ).toBe('last');
+    if (middle instanceof z.ZodArray) {
+      expect(help).toContain('--middle <string> (required; repeatable; positional 2)');
+      expect(parseAction(['first', 'one', 'two', '--last', 'last'], action).args.middle).toEqual(value);
+    } else expect(help).not.toContain('positional 2');
+  }
 });
 
 test('management help and flag parsing share contracts, including explicit false', () => {
@@ -253,6 +339,25 @@ test('help examples and typed/boolean invocations run offline in an isolated dir
     );
     expect((await run(['run', 'brief', '--help'])).out).toContain('Defaults: {"rule":[],"words":12}');
     expect((await run(['run', '--help'])).out).toContain('Usage: ribbit run COMMAND');
+    for (const name of [...ADMIN, 'run', 'flow']) {
+      await writeFile(
+        join(dir, 'commands', `${name}.yaml`),
+        `apiVersion: ribbit/v1\nkind: Command\nname: ${name}\ntype: '@ribbit/take'\ntypeVersion: '1.0.0'\naction: run\ndefaults: {count: 1}\n`,
+      );
+      const help = await run(['run', name, '--help']);
+
+      expect(help.code, `${name}: ${help.err}`).toBe(0);
+      expect(help.out).toContain(`Usage: ribbit run ${name} [arguments]`);
+      expect(help.out).toContain('Type: @ribbit/take');
+      expect(help.out).toContain('Defaults: {"count":1}');
+      expect((await run(['commands', 'validate', name, '--json'])).code).toBe(0);
+      expect(await run(['run', name, '--input', 'lines', '--output', 'jsonl'], 'first\nsecond\n')).toEqual({
+        code: 0,
+        err: '',
+        out: '"first"\n',
+      });
+      expect((await run([name, '--help'])).out).not.toContain('Type: @ribbit/take');
+    }
     const completions = await run(['completions', 'bash']);
 
     expect(completions.code).toBe(0);

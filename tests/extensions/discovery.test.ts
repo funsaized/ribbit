@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { addExtension } from '../../src/extensions/build/index.ts';
+import { ADMIN } from '../../src/cli/admin/contract.ts';
 
 test('catalog/help/completions/plan do not import installed code or invoke fetch', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'ribbit-discovery-')),
@@ -21,10 +22,13 @@ test('catalog/help/completions/plan do not import installed code or invoke fetch
     const initial = await readFile(marker, 'utf8');
 
     await mkdir(join(dir, 'commands'));
-    await writeFile(
-      join(dir, 'commands', 'echo.yaml'),
-      "apiVersion: ribbit/v1\nkind: Command\nname: echo\ntype: '@audit/echo'\ntypeVersion: '1.0.0'\naction: run\n",
-    );
+    const names = ['echo', ...ADMIN, 'run', 'flow'];
+
+    for (const name of names)
+      await writeFile(
+        join(dir, 'commands', `${name}.yaml`),
+        `apiVersion: ribbit/v1\nkind: Command\nname: ${name}\ntype: '@audit/echo'\ntypeVersion: '1.0.0'\naction: run\n`,
+      );
     await writeFile(
       join(dir, 'flow.yaml'),
       'apiVersion: ribbit/v1\nkind: Flow\nname: audit\nsteps:\n  - id: first\n    command: echo\n',
@@ -33,7 +37,7 @@ test('catalog/help/completions/plan do not import installed code or invoke fetch
     for (const args of [
       ['--help'],
       ['echo', '--help'],
-      ['run', 'echo', '--help'],
+      ...names.map((name) => ['run', name, '--help']),
       ['providers', 'add', '--help'],
       ['models', 'list', '--help'],
       ['doctor', '--help'],

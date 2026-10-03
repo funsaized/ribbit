@@ -12,6 +12,11 @@ function help(
   actionName = 'run',
   defaults: Record<string, unknown> = {},
 ) {
+  if (name && manifest) {
+    console.log(actionHelp(name, manifest, actionName, defaults));
+
+    return;
+  }
   if (name === 'flow') {
     console.log(flowHelp());
 
@@ -19,11 +24,6 @@ function help(
   }
   if (name && ADMIN.has(name)) {
     console.log(managementHelp(name, argv[1]?.startsWith('--') ? undefined : argv[1]));
-
-    return;
-  }
-  if (name && manifest) {
-    console.log(actionHelp(name, manifest, actionName, defaults));
 
     return;
   }
@@ -53,10 +53,10 @@ async function main() {
     }
     const name = argv[0] === 'run' ? argv[1] : argv[0];
 
-    if (name && !builtins[name] && !ADMIN.has(name) && name !== 'flow') {
+    if (name && (argv[0] === 'run' || (!builtins[name] && !ADMIN.has(name) && name !== 'flow'))) {
       const invocation = await (await import('../definitions/index.ts')).resolveInvocation(name);
 
-      help(name, invocation.manifest, invocation.action, invocation.args);
+      help(argv[0] === 'run' ? `run ${name}` : name, invocation.manifest, invocation.action, invocation.args);
     } else help(name);
 
     return;

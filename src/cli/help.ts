@@ -12,6 +12,15 @@ function schemaType(schema: JsonSchema): string {
   return Array.isArray(schema.type) ? schema.type.join('|') : (schema.type ?? 'json');
 }
 
+function booleanSyntax(schema: JsonSchema): string {
+  const values = [true, false].filter(
+    (value) =>
+      (!Object.hasOwn(schema, 'const') || schema.const === value) && (!schema.enum || schema.enum.includes(value)),
+  );
+
+  return values.includes(true) ? `[=${values.join('|')}]` : `=${values.join('|')}`;
+}
+
 export function runtimeHelp(action?: ActionManifest, flow = false): string {
   const values: Record<string, string> = {
     input: 'auto|text|lines|jsonl|records',
@@ -56,6 +65,16 @@ export function actionHelp(
   );
 
   Object.assign(defaults, overrides);
+  const positionals = new Set<string>();
+
+  // Complex arguments cannot consume a positional; repeated arguments never advance to the next slot.
+  for (const binding of action.bindings
+    .filter((b) => b.positional !== undefined)
+    .toSorted((a, b) => a.positional! - b.positional!)) {
+    if (!scalarTypes.has(binding.type)) break;
+    positionals.add(binding.field);
+    if (binding.repeated) break;
+  }
   const bindings = action.bindings.map((binding) => {
     const property = action.args.properties[binding.field] as JsonSchema;
     const required = (action.args.required ?? []).includes(binding.field) && !Object.hasOwn(defaults, binding.field);
@@ -63,18 +82,18 @@ export function actionHelp(
 
     if (Object.hasOwn(defaults, binding.field)) details.push(`default: ${JSON.stringify(defaults[binding.field])}`);
     if (binding.repeated) details.push('repeatable');
-    if (binding.positional !== undefined && scalarTypes.has(binding.type))
+    if (binding.positional !== undefined && positionals.has(binding.field))
       details.push(`positional ${binding.positional + 1}`);
     if (!scalarTypes.has(binding.type))
       return `  ${binding.field} <${schemaType(property)}> via --args-json (${details.join('; ')})`;
     const value = schemaType(binding.repeated ? property.items : property);
-    const syntax = binding.type === 'boolean' && !binding.repeated ? '[=true|false]' : ` <${value}>`;
+    const syntax = binding.type === 'boolean' && !binding.repeated ? booleanSyntax(property) : ` <${value}>`;
 
     return `  --${binding.flag}${syntax} (${details.join('; ')})`;
   });
   const examples = action.examples.length ? `\n\nExamples:\n${action.examples.map((e) => `  ${e}`).join('\n')}` : '';
 
-  return `ribbit ${name} — ${action.description}\n\nUsage: ribbit ${name} [arguments] [runtime flags]\nType: ${manifest.type}\nAction: ${actionName}\nDefaults: ${JSON.stringify(defaults)}\n\nArguments:\n${bindings.join('\n')}\n  --args-json <object> (typed JSON values keyed by argument field; required for complex/union fields)\n\nBoolean flags use --flag for true or --flag=false for false.\nScalar arrays repeat their flag; --args-json accepts the entire array.\nDo not assign the same field through multiple forms. Use -- before literal positionals starting with --.\n\nInput: ${action.inputKind}; output: ${action.outputKind}.\n${runtimeHelp(action)}${examples}\n`;
+  return `ribbit ${name} — ${action.description}\n\nUsage: ribbit ${name} [arguments] [runtime flags]\nType: ${manifest.type}\nAction: ${actionName}\nDefaults: ${JSON.stringify(defaults)}\n\nArguments:\n${bindings.join('\n')}\n  --args-json <object> (typed JSON values keyed by argument field; required for complex/union fields)\n\nFor boolean flags, bare --flag supplies true only if the schema permits it; otherwise use --flag=VALUE.\nScalar arrays repeat their flag; --args-json accepts the entire array.\nDo not assign the same field through multiple forms. Use -- before literal positionals starting with --.\n\nInput: ${action.inputKind}; output: ${action.outputKind}.\n${runtimeHelp(action)}${examples}\n`;
 }
 
 export function managementHelp(command: string, operation?: string): string {
