@@ -69,15 +69,25 @@ export function regrade(raw: string, reviews?: Reviews) {
         (attempt.input === undefined || attempt.input === (fixture.input ?? null)) &&
         (attempt.args === undefined || JSON.stringify(attempt.args) === JSON.stringify(fixture.args));
 
-      if (!matches)
-        criteria.push({
-          id: 'fixture-match',
-          layer: 'invariant',
-          expected: { input: fixture.input ?? null, args: fixture.args },
-          actual: { input: attempt.input ?? null, args: attempt.args ?? [] },
-          verdict: 'fail',
-          reason: 'Saved input/arguments differ from this rubric; do not apply its factual verdicts to another task.',
-        });
+      const complete = attempt.input !== undefined && attempt.args !== undefined;
+
+      criteria.push({
+        id: 'fixture-match',
+        layer: 'invariant',
+        expected: { input: fixture.input ?? null, args: fixture.args },
+        actual: {
+          input: attempt.input ?? null,
+          args: attempt.args ?? null,
+          inputProvided: attempt.input !== undefined,
+          argsProvided: attempt.args !== undefined,
+        },
+        verdict: !matches ? 'fail' : complete ? 'pass' : 'review_required',
+        reason: !matches
+          ? 'Saved input/arguments differ from this rubric; do not apply its factual verdicts to another task.'
+          : complete
+            ? 'Saved input and arguments match the candidate fixture.'
+            : 'Missing saved input or arguments; the candidate fixture hash does not prove which task was run.',
+      });
     }
 
     return {

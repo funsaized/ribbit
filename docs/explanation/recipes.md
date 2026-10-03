@@ -32,7 +32,7 @@ Sources: [brief command](../../examples/commands/brief.yaml) and [brief flow](..
 
 The named command reuses `@ribbit/summarize` with a 40-word default and a rule to preserve facts. The flow invokes that name, then rewrites the summary in plain language. A caller can override the word limit without changing the definition.
 
-Unlike the other examples, this workflow deliberately compresses text. Once the summary omits a fact, rewriting cannot reconstruct it reliably. The [versioned rubric](../../evals/README.md#offline-factual-regrade-rubric-200) distinguishes an assigned reviewer from an unassigned one and **by Friday** from **on Friday**. It requires explicit source-grounded review of paraphrases; names and numbers appearing somewhere in the answer are not proof. Unreviewed prose stays pending.
+Unlike the other examples, this workflow deliberately compresses text. Once the summary omits a fact, rewriting cannot reconstruct it reliably. The [versioned rubric](../../evals/README.md#offline-factual-regrade) distinguishes an assigned reviewer from an unassigned one and **by Friday** from **on Friday**. It requires explicit source-grounded review of paraphrases; names and numbers appearing somewhere in the answer are not proof. Unreviewed prose stays pending.
 
 The second step is optional for your own work. If the summary already has the wording you need, a named command alone avoids an extra model request.
 

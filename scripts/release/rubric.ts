@@ -5,8 +5,9 @@ import { z } from 'zod';
 import { hash, stable } from '../../src/sdk/manifest/index.ts';
 import { isJson, validateRecord, type Json, type RecordValue } from '../../src/engine/records/index.ts';
 import { cases, pickerCase, rows, type Case } from './cases.ts';
+import type { FileValue } from '../../src/filesystem/index.ts';
 
-export const RUBRIC_VERSION = '2.0.0';
+export const RUBRIC_VERSION = '2.0.1';
 
 export const fixturePaths = [
   'fixtures/release/feedback.jsonl',
@@ -241,8 +242,11 @@ export function gradeCommand(fixture: Case, attempt: { code: number; out: string
           : 'nonempty text',
       out,
       () => {
-        if (recordCases.has(id)) parsedRecords(out);
-        else if (['extract', 'tree'].includes(command)) assert.ok(isJson(JSON.parse(out)));
+        if (recordCases.has(id)) {
+          const records = parsedRecords(out);
+
+          if (id === 'map-lineage') assert.ok(records.every((r) => typeof r.value === 'string'));
+        } else if (['extract', 'tree'].includes(command)) assert.ok(isJson(JSON.parse(out)));
         else assert.ok(out.trim());
       },
     ),
@@ -266,7 +270,31 @@ export function gradeCommand(fixture: Case, attempt: { code: number; out: string
       );
     if (command === 'map' || command === 'tree')
       criteria.push(
-        checked('identity-lineage', 'invariant', 'All expected envelopes and lineage', out, () => fixture.check(out)),
+        checked('identity-lineage', 'invariant', 'All expected envelopes and lineage', out, () => {
+          if (command === 'map') {
+            const originals = parsedRecords(fixture.input ?? '');
+            const actual = parsedRecords(out);
+
+            assert.equal(actual.length, originals.length);
+            assert.deepEqual(
+              actual,
+              originals.map((r, i) => ({
+                ...r,
+                value: actual[i].value,
+                annotations: { ...r.annotations, map: { originId: r.id } },
+              })),
+            );
+          } else {
+            const tree = JSON.parse(out) as { evidence: unknown; nodes: unknown[] };
+            const nodes = tree.nodes.map((r) => validateRecord(r));
+
+            assert.equal(tree.evidence, 'content');
+            assert.deepEqual(
+              nodes.map((r) => r.id),
+              ['1', '2'],
+            );
+          }
+        }),
       );
     if (command === 'compare')
       criteria.push(
@@ -314,20 +342,77 @@ export function gradeCommand(fixture: Case, attempt: { code: number; out: string
         }
       }),
     );
-  if (['find-semantic', 'tree-about', 'tree-describe'].includes(id))
+  if (id === 'pick-semantic' || id === 'classify-preserve')
     criteria.push(
-      checked('source-bytes', 'invariant', 'Fixture bytes and source paths unchanged', out, () => {
-        const records: RecordValue[] =
-          command === 'tree' ? JSON.parse(out).nodes.map((row: unknown) => validateRecord(row)) : parsedRecords(out);
+      checked('evidence-retention', 'invariant', 'Original IDs, values, sources and prior annotations', out, () => {
+        const actual = parsedRecords(out);
 
-        for (const r of records) {
-          const value = r.value as { path: string; relativePath: string; content: string };
+        if (id === 'pick-semantic') {
+          const value: unknown = JSON.parse(fixtureText['fixtures/release/feedback.jsonl'].split('\n')[0]);
 
-          assert.equal(r.source?.path, value.path);
-          assert.equal(value.content, fixtureText[`fixtures/release/repository/${value.relativePath}`]);
-          assert.ok(['auth.ts', 'colors.ts'].includes(value.relativePath));
+          assert.deepEqual(actual, [
+            {
+              id: '1',
+              value,
+              source: { path: 'feedback.jsonl', lineStart: 1, lineEnd: 1 },
+              annotations: {},
+            },
+          ]);
+        } else {
+          assert.deepEqual(
+            actual.map((r) => {
+              const annotations = { ...r.annotations };
+
+              delete annotations.classify;
+
+              return { ...r, annotations };
+            }),
+            parsedRecords(fixture.input ?? ''),
+          );
         }
       }),
+    );
+  if (['find-semantic', 'tree-about', 'tree-describe'].includes(id))
+    criteria.push(
+      checked(
+        'source-bytes',
+        'invariant',
+        'Fixture IDs, bytes, metadata, sources and annotations retained',
+        out,
+        () => {
+          const tree = command === 'tree' ? (JSON.parse(out) as { root: string; nodes: unknown[] }) : null;
+          const records = tree ? tree.nodes.map((row) => validateRecord(row)) : parsedRecords(out);
+          const names = id === 'tree-describe' ? ['auth.ts', 'colors.ts'] : ['auth.ts'];
+
+          assert.equal(records.length, names.length);
+          for (const [i, r] of records.entries()) {
+            const name = names[i];
+            const value = r.value as unknown as FileValue;
+            const content = fixtureText[`fixtures/release/repository/${name}`];
+
+            assert.equal(r.id, String(i + 1));
+            assert.deepEqual(r.source, { path: value.path });
+            // Sandbox roots and mtimes vary; compare fixed fixture fields and path consistency.
+            assert.ok(value.path.replaceAll('\\', '/').endsWith(`/repository/${name}`));
+            if (tree) assert.equal(value.path.replaceAll('\\', '/'), `${tree.root.replaceAll('\\', '/')}/${name}`);
+            assert.equal(new Date(value.modifiedAt).toISOString(), value.modifiedAt);
+            assert.deepEqual(value, {
+              path: value.path,
+              relativePath: name,
+              kind: 'file',
+              sizeBytes: Buffer.byteLength(content),
+              modifiedAt: value.modifiedAt,
+              content,
+            });
+            if (id === 'tree-describe') {
+              const description = (r.annotations.tree as { description?: Json } | undefined)?.description;
+
+              assert.equal(typeof description, 'string');
+              assert.deepEqual(r.annotations, { tree: { description, evidence: 'content' } });
+            } else assert.deepEqual(r.annotations, {});
+          }
+        },
+      ),
     );
 
   return criteria;

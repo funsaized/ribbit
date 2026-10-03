@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "rubricVersion": "2.0.0",
+  "rubricVersion": "2.0.1",
   "entries": [
     {
       "id": "summarize-facts",
-      "caseSha256": "569b5e6c882f1a7247b9cb7f08902ef38a22bae06ea9fcfc311149d60ca00609",
+      "caseSha256": "b4b768a3fedba16b72be6f57b0dbd23e648c40c0bcd42c2f37b4f790b03c1da6",
       "outputSha256": "e9b26d4794a9a3d5ccfa0a5664c5678cae9c76686135db107cbd6db6f1c302d7",
       "reviewer": {
         "kind": "ai",
@@ -62,7 +62,7 @@
     },
     {
       "id": "explain-audience",
-      "caseSha256": "f7cec615ce731c6cb78bb57c7088e42b094bb952591151b9136a437da68163c2",
+      "caseSha256": "4c5ef0d65a27c86f7f0b7099e54a98b484843f8b27907cfacb4f993afd909488",
       "outputSha256": "ef1629756436a3a3ef6a6cede5d170e2e1b949adc5205edfd8e15e256b338b02",
       "reviewer": {
         "kind": "ai",
@@ -99,7 +99,7 @@
     },
     {
       "id": "rewrite-facts",
-      "caseSha256": "061bd64df4e06b34a2621e09380ad345ad4cf77d3f8868c30bff11bb8f82cf3c",
+      "caseSha256": "f9c07965642759e732b1c3038ab90d6ac80e7693594d9c6cad0f4b016ee66644",
       "outputSha256": "e9b26d4794a9a3d5ccfa0a5664c5678cae9c76686135db107cbd6db6f1c302d7",
       "reviewer": {
         "kind": "ai",
@@ -157,7 +157,7 @@
     },
     {
       "id": "reduce-evidence",
-      "caseSha256": "0bac08a4cd601e791d00e6ac513465b562eda5c0b57520ee47c913e7494c720b",
+      "caseSha256": "aa254c5c0e54d3ca312c5d65c85dbeba0349980bbc5db6d07a47446908861a7d",
       "outputSha256": "569938e52d01d837ddd87a7d9a1ae0000c3429efdcd210565a6ead2f4188db0e",
       "reviewer": {
         "kind": "ai",
@@ -196,7 +196,7 @@
     },
     {
       "id": "reduce-chunked",
-      "caseSha256": "76c4be38414b763af597722ff66b02a744763c29a27dc0eb875d5f65ff8c8c2d",
+      "caseSha256": "59f042677efd9488ff6f391222747186ab7e0bc0012976374c7f1f48eea22414",
       "outputSha256": "2b1c08da637878f8f9d11bd20ebca4e4a4ecfc041c04ca51525e1e0735c4a186",
       "reviewer": {
         "kind": "ai",
@@ -225,7 +225,7 @@
     },
     {
       "id": "compare-sources",
-      "caseSha256": "346232e846a7612268a8c1acba43eca511ed7dbc1f412387f97ca2fa017d3cd7",
+      "caseSha256": "868557e2369b6567de01e28c0a1a873b23ffc05fb793f5e8b71bbb8cc9d647bc",
       "outputSha256": "ff6a2dd57cafd2f114fecca4b96ecbe97d38b9042ae2b96aeb916d34848b8184",
       "reviewer": {
         "kind": "ai",
