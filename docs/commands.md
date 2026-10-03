@@ -42,6 +42,10 @@ Extract JSON matching a local strict JSON Schema. Input: text; output: json.
 - `--instruction`: string (also positional)
 - `--schema`: string
 
+The same external-schema rules apply to `map --schema`: self-contained JSON Schema with supported primitive/nullable types, scalar `const`/`enum`, `anyOf`, nested strict objects (`additionalProperties: false`), arrays with `items`, and string/numeric/array bounds. `$ref`, `oneOf`, `allOf`, formats, and unknown keywords are rejected before a provider call. Sibling constraints are conjunctive: an enum value still has to satisfy its type, length, pattern, and numeric bounds.
+
+AJV is the authoritative runtime validator, and the original admitted schema is sent to the provider without a lossy Zod round trip. Missing object properties may receive defaults under AJV's `useDefaults` behavior; root defaults and defaults inside union branches do not replace missing replies. Validation never coerces types or removes extra properties. An invalid reply gets at most one repair, then exit 4; schema validity proves structure, not the truth of extracted facts.
+
 ## filter
 
 Preserve matching original records in input order. Input: records; output: records.

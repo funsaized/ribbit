@@ -51,6 +51,28 @@ const factCheck =
   };
 const text = 'Mina will fix checkout by Friday. The budget is 240 euros. No reviewer has been assigned.';
 
+export const pickerCase: Case = {
+  id: 'pick-semantic',
+  command: 'pick',
+  args: [
+    '--file',
+    'feedback.jsonl',
+    '--input',
+    'jsonl',
+    '--about',
+    'Most severe customer impact first',
+    '--label',
+    'body',
+  ],
+  semantic: true,
+  check: (out) => {
+    const actual = rows(out);
+
+    assert.equal(actual.length, 1);
+    assert.equal(actual[0].value.ticket, 'R1');
+  },
+};
+
 export function cases(): Case[] {
   const recordInput = wire(originals);
 

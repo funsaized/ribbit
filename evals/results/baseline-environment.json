@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 1,
+  "kind": "baseline-environment",
+  "capturedAt": "2026-10-03T17:26:23.205Z",
+  "packageVersion": "0.1.0-alpha.2",
+  "build": {
+    "schemaVersion": 1,
+    "target": "linux-x64",
+    "executable": "ribbit",
+    "runtime": "1.4.0",
+    "sourceSha256": "5d3f218e3c4ae10e7c5fc0d3837e7346536bf07b82fab885ab564902e65cea7f",
+    "lockSha256": "0b5303f2ba32b98a15f53e57bb603a8f16e97f3655f52a6e6172141e50a08d00",
+    "binarySha256": "b53290656972c98ef81f8c83a5074d16bcc354956b985a690b4f168f82b36587"
+  },
+  "runtime": "1.4.0",
+  "platform": "linux",
+  "arch": "x64",
+  "kernel": "7.2.5-3-omarchy",
+  "cpu": "AMD Ryzen 9 5900XT 16-Core Processor",
+  "logicalCpus": 32,
+  "memoryBytes": 33555795968,
+  "gpu": {
+    "name": "NVIDIA GeForce RTX 3080 Ti",
+    "driverVersion": "610.57.04",
+    "memoryMiB": 12288
+  },
+  "provider": {
+    "name": "LM Studio",
+    "endpoint": "http://127.0.0.1:1234/v1",
+    "lmsCliCommit": "ff50809",
+    "runtimeSelector": "llama.cpp-linux-x86_64-nvidia-cuda12-avx2@2.33.0",
+    "loadedModelRuntime": null,
+    "runtimeNote": "Selector reported by lms runtime ls; actual per-model backend version is not exposed by captured API metadata."
+  },
+  "models": [
+    {
+      "type": "llm",
+      "publisher": "google",
+      "key": "google/gemma-4-e4b",
+      "display_name": "Gemma 4 E4B",
+      "architecture": "gemma4",
+      "quantization": {
+        "name": "Q4_K_M",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 6326918619,
+      "params_string": "7.5B",
+      "loaded_instances": [
+        {
+          "id": "ribbit-baseline-gemma",
+          "config": {
+            "context_length": 8192,
+            "eval_batch_size": 2048,
+            "physical_batch_size": 512,
+            "parallel": 1,
+            "flash_attention": true,
+            "context_checkpoints": 32,
+            "reasoning_budget_message": "",
+            "speculative_draft_mtp": false,
+            "speculative_draft_simple": false,
+            "speculative_draft_model": "",
+            "speculative_draft_max_tokens": 3,
+            "speculative_draft_min_tokens": 0,
+            "speculative_draft_min_continue_probability": 0,
+            "offload_kv_cache_to_gpu": true
+          }
+        }
+      ],
+      "max_context_length": 131072,
+      "format": "gguf",
+      "capabilities": {
+        "vision": true,
+        "trained_for_tool_use": true,
+        "reasoning": {
+          "allowed_options": [
+            "off",
+            "on"
+          ],
+          "default": "on"
+        }
+      },
+      "description": null,
+      "variants": [
+        "google/gemma-4-e4b@q4_k_m"
+      ],
+      "selected_variant": "google/gemma-4-e4b@q4_k_m"
+    },
+    {
+      "type": "llm",
+      "publisher": "Qwen",
+      "key": "qwen2.5-0.5b-instruct",
+      "display_name": "Ribbit Qwen2.5 0.5B Instruct",
+      "architecture": "qwen2",
+      "quantization": {
+        "name": "Q4_K_M",
+        "bits_per_weight": 4
+      },
+      "size_bytes": 491400032,
+      "params_string": "630M",
+      "loaded_instances": [
+        {
+          "id": "ribbit-baseline-small",
+          "config": {
+            "context_length": 4096,
+            "eval_batch_size": 2048,
+            "physical_batch_size": 512,
+            "parallel": 1,
+            "flash_attention": true,
+            "context_checkpoints": 32,
+            "reasoning_budget_message": "",
+            "speculative_draft_mtp": false,
+            "speculative_draft_simple": false,
+            "speculative_draft_model": "",
+            "speculative_draft_max_tokens": 3,
+            "speculative_draft_min_tokens": 0,
+            "speculative_draft_min_continue_probability": 0,
+            "offload_kv_cache_to_gpu": true
+          }
+        }
+      ],
+      "max_context_length": 32768,
+      "format": "gguf",
+      "capabilities": {
+        "vision": false,
+        "trained_for_tool_use": true
+      },
+      "description": null
+    }
+  ],
+  "modelFiles": [
+    {
+      "model": "ribbit-baseline-gemma",
+      "file": "lmstudio-community/gemma-4-E4B-it-GGUF/gemma-4-E4B-it-Q4_K_M.gguf",
+      "sizeBytes": 5335291936,
+      "sha256": "0ffb122c8b6921f13cbc34186e052524d0b5803b17f4867b7197a561400b3770"
+    },
+    {
+      "model": "ribbit-baseline-small",
+      "file": "Qwen/Qwen2.5-0.5B-Instruct-GGUF/ribbit-qwen2.5-0.5b-instruct-q4_k_m.gguf",
+      "sizeBytes": 491400032,
+      "sha256": "74a4da8c9fdbcd15bd1f6d01d621410d31c6fc00986f5eb687824e7b93d7a9db"
+    }
+  ],
+  "modelLoading": {
+    "gpu": "max",
+    "parallel": 1,
+    "downloaded": false
+  },
+  "tools": {
+    "codex": "0.160.0",
+    "fzf": "0.74.3 (15f64c49)",
+    "python": "3.14.7"
+  },
+  "limitations": [
+    "Existing models and server; no model downloads, remote inference, or cloud credentials.",
+    "Shared workstation, uncontrolled load/cache state, no pinned seed or monetary cost estimate.",
+    "Command runs request temperature 0 and reasoning off with 2048 output tokens; workflow reasoning and harness sampling use defaults.",
+    "Weights digests cover the text GGUF files; catalog sizes can include additional vision components.",
+    "Source-grounded prose and independent human review are pending; this is not general model-quality certification."
+  ]
+}

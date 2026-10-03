@@ -1,10 +1,10 @@
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { cpus, totalmem } from 'node:os';
-import { cases, rows, type Case } from './cases.ts';
+import { cases, pickerCase } from './cases.ts';
+import { RUBRIC_VERSION, fixtureHashes, gradeCommand, status } from './rubric.ts';
 import { resolve } from 'node:path';
-import assert from 'node:assert/strict';
-import { sandbox, parseStats } from './harness.ts';
+import { sandbox, parseStats, evaluationProvenance } from './harness.ts';
 
 const argv = process.argv.slice(2);
 
@@ -43,30 +43,13 @@ const mode = option('--mode', 'smoke');
 
 if (!['smoke', 'full'].includes(mode!)) throw new Error('Use --mode smoke or full');
 const profile = option('--profile', 'evaluation')!;
-const picker: Case = {
-  id: 'pick-semantic',
-  command: 'pick',
-  args: [
-    '--file',
-    'feedback.jsonl',
-    '--input',
-    'jsonl',
-    '--about',
-    'Most severe customer impact first',
-    '--label',
-    'body',
-  ],
-  semantic: true,
-  check: (out) => assert.equal(rows(out)[0].value.ticket, 'R1'),
-};
-const selected = [...cases(), picker].filter(
+const selected = [...cases(), pickerCase].filter(
   (c) => c.semantic && (!option('--command') || c.command === option('--command')),
 );
 
 if (!selected.length) throw new Error('No semantic cases selected');
 const repetitions = mode === 'full' ? 3 : 1;
 const sha = (value: Uint8Array | string) => createHash('sha256').update(value).digest('hex');
-const revision = (await new Response(Bun.spawn(['git', 'rev-parse', 'HEAD'], { stdout: 'pipe' }).stdout).text()).trim();
 const directory = `evals/results/release/${new Date().toISOString().replace(/[:.]/g, '-')}-${model.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
 
 await mkdir(directory, { recursive: true });
@@ -126,9 +109,11 @@ const env = await sandbox({
   default: { profile },
 });
 const report: any = {
-  schemaVersion: 1,
+  schemaVersion: 2,
+  rubricVersion: RUBRIC_VERSION,
+  fixtureHashes,
   date: new Date().toISOString(),
-  revision,
+  ...(await evaluationProvenance()),
   binarySha256: sha(await readFile(env.binary)),
   fixtureSha256: sha(await readFile('scripts/release/cases.ts')),
   model,
@@ -149,10 +134,12 @@ const report: any = {
   dataset: 'Authored public regression fixtures, no held-out claim; no prompt tuning during this run.',
   limitations: [
     'Small regression sample, not broad quality certification',
-    'String fact checks are only a deterministic floor; independent semantic review is pending',
+    'Prose needs output-bound source review unless it exactly matches an authored reference',
+    'Shape, invariants, facts, citations and independent review have separate criteria',
     'Recording proxy buffers SSE; wall time includes proxy and CLI overhead',
   ],
-  thresholds: 'Every selected case must pass every repetition; no aggregate waiver.',
+  thresholds:
+    'Every required criterion must pass every repetition; review_required is not a pass. No aggregate waiver.',
   attempts,
 };
 
@@ -199,14 +186,11 @@ try {
           elapsedMs: performance.now() - started,
         };
       } else result = await env.run(args, c.input);
-      let failure: string | null = null;
-
-      try {
-        if (result.code !== 0) throw new Error(`CLI exit ${result.code}`);
-        c.check(result.out);
-      } catch (error) {
-        failure = (error as Error).message;
-      }
+      const criteria = gradeCommand(c, result);
+      const verdict = status(criteria);
+      const failure =
+        criteria.find((criterion) => criterion.verdict === 'fail')?.reason ??
+        (verdict === 'review_required' ? 'Source-grounded review required' : null);
       const stats = parseStats(result.err);
 
       attempts.push({
@@ -218,14 +202,23 @@ try {
         ...result,
         stats,
         transport,
-        pass: failure === null,
+        rubricVersion: RUBRIC_VERSION,
+        criteria,
+        status: verdict,
+        pass: verdict === 'pass',
         failure,
-        firstPassCorrect: stats ? failure === null && stats.repairs === 0 : null,
+        firstCallValid: stats ? result.code === 0 && stats.repairs === 0 && stats.retries === 0 : null,
+        factualCorrect: criteria.some((criterion) => criterion.layer === 'fact' && criterion.verdict === 'fail')
+          ? false
+          : verdict === 'pass'
+            ? true
+            : null,
       });
       await writeFile(`${directory}/report.json`, JSON.stringify(report, null, 2) + '\n');
       console.log(`${attempts.length}/${selected.length * repetitions} ${c.id}: ${failure ?? 'pass'}`);
     }
-  report.pass = attempts.every((a) => a.pass);
+  report.status = status(attempts.flatMap((a) => a.criteria));
+  report.pass = report.status === 'pass';
   report.byCommand = Object.fromEntries(
     [...new Set(attempts.map((a) => a.command))].map((command) => [
       command,

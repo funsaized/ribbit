@@ -1,9 +1,41 @@
 import { binaryName, cleanEnvironment } from '../platform.ts';
-import { mkdtemp, mkdir, cp, writeFile, rm, copyFile, symlink } from 'node:fs/promises';
+import { mkdtemp, mkdir, cp, writeFile, rm, copyFile, symlink, readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { stringify } from 'yaml';
 import { constants } from 'node:fs';
+import { createHash } from 'node:crypto';
+
+export async function evaluationProvenance() {
+  const git = async (args: string[]) => {
+    const p = Bun.spawn(['git', ...args], { stdout: 'pipe', stderr: 'pipe' });
+    const [out, err, code] = await Promise.all([
+      new Response(p.stdout).text(),
+      new Response(p.stderr).text(),
+      p.exited,
+    ]);
+
+    if (code) throw new Error(`Cannot record Git provenance: ${err}`);
+
+    return out.trim();
+  };
+
+  return {
+    revision: await git(['rev-parse', 'HEAD']),
+    worktreeDirty: !!(await git(['status', '--porcelain'])),
+    build: JSON.parse(await readFile('dist/build.json', 'utf8')) as unknown,
+    evaluatorHashes: Object.fromEntries(
+      await Promise.all(
+        ['harness.ts', 'evaluate.ts', 'workflows.ts', 'handoff.ts', 'rubric.ts', 'regrade.ts'].map(async (name) => [
+          name,
+          createHash('sha256')
+            .update(await readFile(`scripts/release/${name}`))
+            .digest('hex'),
+        ]),
+      ),
+    ),
+  };
+}
 
 export async function sandbox(config: unknown = {}) {
   const dir = await mkdtemp(join(tmpdir(), 'ribbit-release-'));

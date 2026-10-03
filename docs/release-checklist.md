@@ -15,7 +15,7 @@ Ribbit composes typed shell commands, local-model tasks, stronger-model steps, a
 | Composition | [Recipe tests](../tests/release/recipes.test.ts) | Real shell pipes, inline and saved flows agree; routes, originals, metadata, and budgets asserted |
 | Local model evidence | [Per-command results](models.md) | Every semantic command and optional semantic mode exercised; failed attempts retained |
 | Three product recipes | [Runnable guide](recipes.md), [model comparison](models.md) | Local-only/direct-stronger/mixed outputs and overhead measured on shared synthetic fixtures |
-| External harness | [Model/harness evidence](models.md) | Actual local Codex read-only stdin handoff tested; not autonomous coding certification |
+| External harness | [Model/harness evidence](models.md) | Current local Codex read-only stdin handoff recorded; source correctness requires review, not keyword presence |
 | Isolated distribution | [Smoke runner](../scripts/smoke.ts) | Copied binary/lib and isolated HOME/XDG paths; no maintainer config |
 | Usage documentation | [Documentation hub](index.md), [strict site build](../.github/workflows/docs.yml) | Diátaxis navigation, searchable site, and repository Markdown links checked |
 | Contributor and security guidance | [Contributing](../CONTRIBUTING.md), [security](../SECURITY.md) | MIT adopted; private reporting enabled for the public repository |
@@ -27,7 +27,7 @@ Run `bun run verify` for the deterministic gate, then `bun run package:release &
 
 ## What the evidence supports
 
-The stronger installed local model passes the current public regression floor with a sufficient output-token allowance. The 0.5B candidate fails important semantic cases even when its JSON is valid. The supplied annotation recipes preserve evidence and allow downstream review, but do not establish speed, cost, or general quality improvement over direct stronger-model calls. Documentation explicitly describes this tradeoff.
+The [current-state baseline](../evals/README.md) separates deterministic passes, failures, and pending source-grounded review. Neither local model has automatic factual acceptance while required prose judgments remain pending. The supplied annotation recipes preserve evidence and allow downstream review, but do not establish speed, cost, or general quality improvement over direct stronger-model calls.
 
 The original 22-command scope is retained; `where` adds a 23rd exact selector with separate packaged flow coverage. Exact modes can be presented with their tested deterministic contracts. Semantic commands should remain experimental and tied to measured profiles. Version `0.1.0-alpha.1` is an experimental preview; no 1.0 promise is introduced.
 

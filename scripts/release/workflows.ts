@@ -1,7 +1,8 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { sandbox } from './harness.ts';
+import { sandbox, parseStats, evaluationProvenance } from './harness.ts';
 import { rows } from './cases.ts';
+import { RUBRIC_VERSION, fixtureHashes, gradeWorkflow, status } from './rubric.ts';
 
 if (process.env.RIBBIT_RUN_LIVE_EVAL !== '1') throw new Error('Set RIBBIT_RUN_LIVE_EVAL=1');
 const small = process.argv[2],
@@ -27,8 +28,11 @@ await mkdir(directory, { recursive: true });
 const attempts: any[] = [];
 const sha = (b: Uint8Array) => createHash('sha256').update(b).digest('hex');
 const report: any = {
-  schemaVersion: 1,
+  schemaVersion: 2,
+  rubricVersion: RUBRIC_VERSION,
+  fixtureHashes,
   date: new Date().toISOString(),
+  ...(await evaluationProvenance()),
   small,
   strong,
   binarySha256: sha(await readFile(env.binary)),
@@ -36,12 +40,13 @@ const report: any = {
   repetitions: 3,
   attempts,
   limitations: [
-    'Synthetic public fixtures; deterministic fact checks only',
+    'Synthetic public fixtures; exact retention checks and explicit source-grounded prose review',
     'No independent reviewer or held-out generalization claim',
     'Wall time includes CLI overhead; provider cache state not controlled',
     'Full evidence is retained; no context-saving claim',
   ],
-  acceptance: 'Each recipe/route must satisfy the same fact and source-retention floor on all three repetitions.',
+  acceptance:
+    'Each recipe/route must satisfy the same layered criteria on all three repetitions; review_required is not a pass.',
 };
 const instruction =
   'Prioritize the tickets. Cite every ticket ID and preserve accessibility failures. Treat labels as fallible suggestions; verify against original bodies. Separate observations from hypotheses.';
@@ -55,19 +60,7 @@ try {
         const stages: any[] = [];
         const run = async (args: string[], input = '') => {
           const result = await env.run([...args, '--stats', '--request-ms', '30000', '--total-ms', '90000'], input);
-          const stats =
-            result.err
-              .split('\n')
-              .flatMap((line) => {
-                try {
-                  const v = JSON.parse(line);
-
-                  return 'requests' in v ? [v] : [];
-                } catch {
-                  return [];
-                }
-              })
-              .at(-1) ?? null;
+          const stats = parseStats(result.err);
 
           stages.push({ args, input, ...result, stats });
           if (result.code) throw new Error(`CLI exit ${result.code}`);
@@ -106,11 +99,8 @@ try {
               );
             const admitted = rows(evidence);
 
-            evidenceRetention = admitted.filter((r) => source.includes(JSON.stringify(r.value))).length / 3;
             downstreamBytes = Buffer.byteLength(admitted.map((r) => JSON.stringify(r)).join('\n'));
             final = await run(['reduce', instruction, '--profile', finalProfile], evidence);
-            for (const term of ['R1', 'R2', 'R3']) if (!final.includes(term)) throw new Error(`Missing ${term}`);
-            if (!/screen reader|accessib/i.test(final)) throw new Error('Missing accessibility issue');
           } else if (recipe === 'context') {
             let evidence = await run([
               'find',
@@ -140,7 +130,6 @@ try {
               );
             const admitted = rows(evidence);
 
-            evidenceRetention = admitted.filter((r) => r.source.path === r.value.path && r.value.content).length / 2;
             downstreamBytes = Buffer.byteLength(admitted.map((r) => JSON.stringify(r)).join('\n'));
             final = await run(
               [
@@ -151,13 +140,6 @@ try {
               ],
               evidence,
             );
-            if (
-              !final.includes('auth.ts') ||
-              !final.includes('colors.ts') ||
-              !final.includes('expiresAt') ||
-              !final.includes('now')
-            )
-              throw new Error('Missing source or condition');
           } else {
             let evidence = meeting;
 
@@ -184,12 +166,18 @@ try {
               ],
               evidence,
             );
-            for (const fact of ['Mina', 'Friday', '240']) if (!final.includes(fact)) throw new Error(`Missing ${fact}`);
           }
-          if (evidenceRetention !== null && evidenceRetention !== 1) throw new Error('Evidence lost');
         } catch (error) {
           failure = (error as Error).message;
         }
+        const criteria = gradeWorkflow({ recipe, final, stages });
+        const verdict = status(criteria);
+
+        evidenceRetention =
+          criteria.find((criterion) => criterion.id === 'evidence-retention')?.verdict === 'pass' ? 1 : null;
+        failure ??=
+          criteria.find((criterion) => criterion.verdict === 'fail')?.reason ??
+          (verdict === 'review_required' ? 'Source-grounded review required' : null);
         attempts.push({
           recipe,
           mode,
@@ -197,12 +185,15 @@ try {
           stages,
           final,
           failure,
-          pass: failure === null,
+          rubricVersion: RUBRIC_VERSION,
+          criteria,
+          status: verdict,
+          pass: verdict === 'pass',
           elapsedMs: performance.now() - started,
           downstreamBytes,
           evidenceRetention,
-          falseNegativesFromSelection: recipe === 'brief' ? null : 0,
-          requests: stages.reduce((n, s) => n + (s.stats?.requests ?? 0), 0),
+          falseNegativesFromSelection: null,
+          requests: stages.some((s) => !s.stats) ? null : stages.reduce((n, s) => n + s.stats.requests, 0),
           tokens: stages.some((s) => !s.stats || s.stats.tokens === 'unknown')
             ? null
             : stages.reduce((n, s) => n + s.stats.tokens, 0),
@@ -210,7 +201,8 @@ try {
         await writeFile(`${directory}/report.json`, JSON.stringify(report, null, 2) + '\n');
         console.log(`${attempts.length}/27 ${recipe} ${mode}: ${failure ?? 'pass'}`);
       }
-  report.pass = attempts.every((a) => a.pass);
+  report.status = status(attempts.flatMap((a) => a.criteria));
+  report.pass = report.status === 'pass';
   await writeFile(`${directory}/report.json`, JSON.stringify(report, null, 2) + '\n');
   console.log(directory);
   if (!report.pass) process.exitCode = 1;
