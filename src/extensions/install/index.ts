@@ -47,7 +47,8 @@ export async function sourceDigest(source: string): Promise<string> {
   return hash(stable(entries));
 }
 
-export async function listInstalled(home = extensionHome()): Promise<Installation[]> {
+// Removal needs registry metadata, not a currently executable action contract.
+async function readRegistry(home: string): Promise<Installation[]> {
   try {
     const files = (await readdir(home)).filter((name) => /^[a-f0-9]{64}\.json$/.test(name));
 
@@ -64,12 +65,6 @@ export async function listInstalled(home = extensionHome()): Promise<Installatio
         )
           throw new RibbitError(3, 'Invalid installed extension registry');
 
-        for (const action of Object.values(item.manifest.actions)) {
-          if (Object.hasOwn(action, 'inferenceWhen'))
-            throw new RibbitError(3, 'Replace inferenceWhen with conditional capabilities and run extensions add');
-          validateCapabilities(action.capabilities, action.args, 3);
-        }
-
         return item;
       }),
     );
@@ -78,6 +73,24 @@ export async function listInstalled(home = extensionHome()): Promise<Installatio
     if (error instanceof RibbitError) throw error;
     throw new RibbitError(3, 'Cannot read extension registry');
   }
+}
+
+export async function listInstalled(home = extensionHome()): Promise<Installation[]> {
+  const items = await readRegistry(home);
+
+  try {
+    for (const item of items)
+      for (const action of Object.values(item.manifest.actions)) {
+        if (Object.hasOwn(action, 'inferenceWhen'))
+          throw new RibbitError(3, 'Replace inferenceWhen with conditional capabilities and run extensions add');
+        validateCapabilities(action.capabilities, action.args, 3);
+      }
+  } catch (error) {
+    if (error instanceof RibbitError) throw error;
+    throw new RibbitError(3, 'Invalid installed extension manifest');
+  }
+
+  return items;
 }
 
 export async function activate(
@@ -111,7 +124,7 @@ export async function activate(
 }
 
 export async function removeInstalled(type: string, home = extensionHome()): Promise<void> {
-  const items = await listInstalled(home),
+  const items = await readRegistry(home),
     item = items.find((i) => i.manifest.type === type);
 
   if (!item) throw new RibbitError(3, 'Extension is not installed');
