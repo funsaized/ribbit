@@ -59,6 +59,10 @@ ribbit flow run --input jsonl --output jsonl -- select name :: take 1
 
 The example reads stdin. A literal standalone `::` is reserved even if shell-quoted; a longer instruction containing those characters remains an ordinary argument.
 
+Each planned step includes `inference.status`: `exact`, `semantic`, or `unresolved`. Exact and semantic results include their resolved `capabilities`; unresolved results list the selector `arguments` and their `references`. A null route can mean exact execution **or deferred resolution**; always inspect the status. References in unrelated arguments do not prevent resolving known requirements, and a known true argument determines a `whenAny` branch even when another selector is unresolved.
+
+Referenced mode selectors are never treated as truthy objects or replaced by the union of both capability branches. Their route and capability checks are deferred until execution binds and validates the actual values. Potentially semantic steps use bounded semantic limits while unresolved. Defaults still apply to known arguments. `flow validate` reports structural `valid` status separately from capability-check `complete` status and lists `deferred` steps; neither guarantees runtime data or model correctness.
+
 Planning and validation inspect declarations without importing extension code or contacting models. Steps share budgets. Single-use whole outputs stream where possible; reused outputs and nested references buffer within those limits. Flow output accounting is cumulative.
 
 Route precedence is documented in [configuration](configuration.md). For running supplied examples, see [mixed-model routing](../how-to/route-workflows.md).

@@ -143,7 +143,7 @@ export const filesystemCommands = {
 
       return a.about ? about(rows, a.about, ctx) : rows;
     },
-    { cli: { positionals: ['root'] }, capabilities: ['object'], inferenceWhen: ['about'] },
+    { cli: { positionals: ['root'] }, capabilities: { whenAny: ['about'], ifTrue: ['object'], ifFalse: [] } },
   ),
   tree: command(
     'tree',
@@ -241,8 +241,7 @@ export const filesystemCommands = {
       cli: { positionals: ['root'] },
       output: jsonValueSchema,
       outputKind: 'display',
-      capabilities: ['object'],
-      inferenceWhen: ['about', 'describe'],
+      capabilities: { whenAny: ['about', 'describe'], ifTrue: ['object'], ifFalse: [] },
     },
   ),
   pick: command(
@@ -347,8 +346,7 @@ export const filesystemCommands = {
       output: recordSchema,
       inputKind: 'records',
       outputKind: 'records',
-      capabilities: ['object'],
-      inferenceWhen: ['about'],
+      capabilities: { whenAny: ['about'], ifTrue: ['object'], ifFalse: [] },
       effects: ['process', 'terminal'],
       barrier: true,
     },

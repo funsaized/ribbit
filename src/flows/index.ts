@@ -6,6 +6,7 @@ import { RibbitError } from '../engine/records/index.ts';
 import { runInvocation, routeFor, type Data, type Invocation } from '../engine/runtime/index.ts';
 import { inspectRoute } from '../routing/index.ts';
 import type { Budget } from '../sdk/index.ts';
+import { resolveCapabilities, type CapabilityResolution } from '../sdk/capabilities.ts';
 
 const stepSchema = z.strictObject({
   id: z.string().regex(/^[A-Za-z][A-Za-z0-9_-]*$/),
@@ -29,7 +30,13 @@ type Flow = z.infer<typeof flowSchema>;
 
 export interface Plan {
   flow: Flow;
-  steps: { invocation: Invocation; binding: unknown; route: unknown; barrier: boolean }[];
+  steps: {
+    invocation: Invocation;
+    binding: unknown;
+    inference: CapabilityResolution & { references?: string[] };
+    route: unknown;
+    barrier: boolean;
+  }[];
   force?: string;
   inference?: Inference;
   project?: Inference;
@@ -146,7 +153,13 @@ export async function planFlow(raw: unknown, config: Config, force?: string, inf
 
     for (const ref of [...refs(binding), ...refs(step.args)])
       if (!seen.has(reference(ref).key)) throw new RibbitError(2, 'Missing or future flow reference', ref);
-    invocation.args = { ...invocation.args, ...step.args };
+    const defaults = Object.fromEntries(
+      Object.entries(invocation.manifest.actions[invocation.action].args.properties ?? {})
+        .filter(([, property]) => Object.hasOwn(property as object, 'default'))
+        .map(([field, property]) => [field, structuredClone((property as { default: unknown }).default)]),
+    );
+
+    invocation.args = { ...defaults, ...invocation.args, ...step.args };
     if (!refs(step.args).length)
       invocation.args = validateJson(
         invocation.manifest.actions[invocation.action].args,
@@ -170,14 +183,31 @@ export async function planFlow(raw: unknown, config: Config, force?: string, inf
         ? { type: 'array', items: action.output }
         : action.output,
     );
-    const route = routeFor(
-      invocation,
-      config,
-      { project, savedFlow: flow.inference, invocationFlow: inference, step: step.inference },
-      force,
+    const requirements = resolveCapabilities(
+      action,
+      invocation.args,
+      new Set(Object.keys(invocation.args).filter((field) => refs(invocation.args[field]).length > 0)),
     );
+    const route =
+      requirements.status === 'unresolved'
+        ? undefined
+        : routeFor(
+            invocation,
+            config,
+            { project, savedFlow: flow.inference, invocationFlow: inference, step: step.inference },
+            force,
+          );
 
-    steps.push({ invocation, binding, route: route ? inspectRoute(route) : null, barrier: action.barrier });
+    steps.push({
+      invocation,
+      binding,
+      inference:
+        requirements.status === 'unresolved'
+          ? { ...requirements, references: requirements.arguments.flatMap((field) => refs(invocation.args[field])) }
+          : requirements,
+      route: route ? inspectRoute(route) : null,
+      barrier: action.barrier,
+    });
     seen.add(step.id);
   }
   for (const ref of refs(flow.output)) {

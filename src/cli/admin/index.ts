@@ -13,6 +13,7 @@ import { listInstalled, removeInstalled } from '../../extensions/install/index.t
 import { RUNTIME_FLAGS } from '../../sdk/manifest/index.ts';
 import { ADMIN, MANAGEMENT, managementBooleans } from './contract.ts';
 import { scalarTypes } from '../parser/index.ts';
+import { resolveCapabilities } from '../../sdk/capabilities.ts';
 
 export function options(tokens: string[], allowed: string[]) {
   // Management handlers validate heterogeneous flag values against their own schemas.
@@ -308,11 +309,12 @@ export async function admin(command: string, tokens: string[]): Promise<void> {
       },
     });
 
-    result(
-      route
+    result({
+      ...(route
         ? inspectRoute(route)
-        : { inference: false, effects: invocation.manifest.actions[invocation.action].effects },
-    );
+        : { inference: false, effects: invocation.manifest.actions[invocation.action].effects }),
+      requirements: resolveCapabilities(invocation.manifest.actions[invocation.action], invocation.args),
+    });
 
     return;
   }

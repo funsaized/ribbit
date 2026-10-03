@@ -6,6 +6,18 @@ The adjacent distribution `lib/` is a private `@ribbit/sdk` package. It exports 
 
 An action declares description, schemas, mode (`value`, `records`, `text-stream`), input/output kind, effects and capabilities. Record mode receives and returns async iterables. CLI bindings derive from args: scalar fields become kebab-case flags, scalar arrays repeat, complex values use `--args-json`. CLI positionals are explicitly declared in `cli.positionals`. Runtime flag collisions fail generation. Config belongs to the definition; callers override args, not config.
 
+## Inference capabilities
+
+`capabilities` is either an unconditional array (for example `['text']`, or `[]` for no managed inference) or a declarative selector:
+
+```ts
+capabilities: { whenAny: ['schema'], ifTrue: ['object'], ifFalse: ['text'] }
+```
+
+`whenAny` names one or more distinct top-level string or boolean arguments. After argument defaults and overrides, any truthy selector chooses `ifTrue`; otherwise `ifFalse` applies. Missing optional values, `false`, and empty strings are false. Both branches are explicit capability arrays. Supported names are `text`, `stream`, `object`, `temperature`, `maxOutputTokens`, and `reasoning`. Unknown capabilities, unknown/non-string/non-boolean selector fields, and malformed declarations fail export or installed-manifest admission.
+
+This replaces `inferenceWhen` in place; the manifest schema version remains 1. Update conditional declarations and explicitly rebuild installed extensions with `extensions add`. Discovery never migrates or imports an implementation. Runtime, help, routing and flow planning use the exported declaration; managed calls inconsistent with the selected branch fail before HTTP. Effects remain declarations of possible trusted behavior, not proof that a particular invocation performs every effect.
+
 Execution receives `{input,args,config}` and context with `signal`, `budget`, `log`, optional `inputKind` and managed `llm.text(instruction,evidence)` / `llm.object(instruction,evidence,schema)`. Honor cancellation and await calls. Managed calls share route, retry, repair, time and request budgets. Declared effects describe trusted behavior and do not restrict arbitrary TypeScript.
 
 Fixture JSON uses `input`, optional `args`, `config`, `action`, expected JSON `expected` or numeric `error`, and optional ordered mock `responses`. Fixtures are deterministic contract checks, not live provider or quality evidence.

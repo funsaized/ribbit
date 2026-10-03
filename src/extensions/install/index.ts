@@ -4,6 +4,7 @@ import { join, relative, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { hash, stable, type Manifest } from '../../sdk/manifest/index.ts';
 import { RibbitError } from '../../engine/records/index.ts';
+import { validateCapabilities } from '../../sdk/capabilities.ts';
 
 export interface Installation {
   schemaVersion: 1;
@@ -62,6 +63,12 @@ export async function listInstalled(home = extensionHome()): Promise<Installatio
           !/^[a-f0-9]{64}$/.test(item.artifactHash)
         )
           throw new RibbitError(3, 'Invalid installed extension registry');
+
+        for (const action of Object.values(item.manifest.actions)) {
+          if (Object.hasOwn(action, 'inferenceWhen'))
+            throw new RibbitError(3, 'Replace inferenceWhen with conditional capabilities and run extensions add');
+          validateCapabilities(action.capabilities, action.args, 3);
+        }
 
         return item;
       }),

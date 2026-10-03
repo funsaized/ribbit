@@ -53,6 +53,24 @@ test('reserved flag and runtime code transforms/refinements fail export', () => 
   ])
     expect(() => schemaToJson(bad)).toThrow();
 });
+test('conditional capabilities survive export and invalid selectors fail export', () => {
+  const base = command();
+  const conditional = {
+    ...base,
+    actions: {
+      run: {
+        ...base.actions.run,
+        args: z.strictObject({ schema: z.string().optional() }),
+        capabilities: { whenAny: ['schema'], ifTrue: ['object'], ifFalse: ['text'] },
+      },
+    },
+  };
+
+  expect(manifest(conditional, hash('source')).actions.run.capabilities).toEqual(conditional.actions.run.capabilities);
+  conditional.actions.run.capabilities.whenAny = ['missing'];
+  expect(() => manifest(conditional, hash('source'))).toThrow('Capability selector missing');
+});
+
 test('record envelopes export JSON value and annotation contracts', () => {
   const schema = schemaToJson(recordSchema) as any;
 

@@ -16,7 +16,7 @@ test('catalog/help/completions/plan do not import installed code or invoke fetch
     await mkdir(source);
     await writeFile(
       join(source, 'index.ts'),
-      `import {appendFileSync} from 'node:fs';import {defineCommand,defineAction,z} from '@ribbit/sdk';appendFileSync(${JSON.stringify(marker)},'import\\n');const config=z.strictObject({});export default defineCommand({type:'@audit/echo',version:'1.0.0',description:'audit',config,actions:{run:defineAction({config,args:config,input:z.string(),output:z.string(),mode:'value',description:'echo',inputKind:'text',outputKind:'text',capabilities:[],effects:[],execute:({input})=>input})}});`,
+      `import {appendFileSync} from 'node:fs';import {defineCommand,defineAction,z} from '@ribbit/sdk';appendFileSync(${JSON.stringify(marker)},'import\\n');const config=z.strictObject({});export default defineCommand({type:'@audit/echo',version:'1.0.0',description:'audit',config,actions:{run:defineAction({config,args:z.strictObject({semantic:z.boolean().default(false)}),input:z.string(),output:z.string(),mode:'value',description:'echo',inputKind:'text',outputKind:'text',capabilities:{whenAny:['semantic'],ifTrue:['text'],ifFalse:[]},effects:[],execute:({input})=>input})}});`,
     );
     await addExtension(source, join(data, 'ribbit', 'extensions'));
     const initial = await readFile(marker, 'utf8');
@@ -33,6 +33,25 @@ test('catalog/help/completions/plan do not import installed code or invoke fetch
       join(dir, 'flow.yaml'),
       'apiVersion: ribbit/v1\nkind: Flow\nname: audit\nsteps:\n  - id: first\n    command: echo\n',
     );
+    await mkdir(join(dir, 'config', 'ribbit'), { recursive: true });
+    await writeFile(
+      join(dir, 'config', 'ribbit', 'config.yaml'),
+      JSON.stringify({
+        providers: {
+          synthetic: {
+            type: 'ollama',
+            baseUrl: 'http://127.0.0.1:1',
+            defaultModel: 'synthetic',
+            capabilities: ['text'],
+          },
+        },
+        default: { provider: 'synthetic' },
+      }),
+    );
+    await writeFile(
+      join(dir, 'commands', 'semantic-echo.yaml'),
+      "apiVersion: ribbit/v1\nkind: Command\nname: semantic-echo\ntype: '@audit/echo'\ntypeVersion: '1.0.0'\naction: run\ndefaults: {semantic: true}\n",
+    );
     await writeFile(guard, "globalThis.fetch=(()=>{throw new Error('NETWORK FORBIDDEN');}) as typeof fetch;");
     for (const args of [
       ['--help'],
@@ -46,6 +65,9 @@ test('catalog/help/completions/plan do not import installed code or invoke fetch
       ['types', 'list', '--json'],
       ['commands', 'describe', 'echo', '--json'],
       ['route', 'inspect', 'echo', '--json'],
+      ['route', 'inspect', 'semantic-echo', '--json'],
+      ['flow', 'plan', '--', 'semantic-echo'],
+      ['doctor', '--probe=false', '--json'],
       ['flow', 'plan', 'flow.yaml'],
       ...['bash', 'zsh', 'fish'].map((s) => ['completions', s]),
     ]) {

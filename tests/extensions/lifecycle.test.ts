@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { addExtension } from '../../src/extensions/build/index.ts';
 import { listInstalled, loadInstalled, removeInstalled } from '../../src/extensions/install/index.ts';
+import { hash } from '../../src/sdk/manifest/index.ts';
 
 test('explicit build/install, dormant inspection, stale hash, rollback and source-preserving remove', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'ribbit-ext-test-')),
@@ -29,6 +30,23 @@ test('explicit build/install, dormant inspection, stale hash, rollback and sourc
     expect((await listInstalled(home))[0].artifactHash).toBe(installed.artifactHash);
     await writeFile(join(source, 'index.ts'), code);
     await loadInstalled('@test/echo', home);
+    const registry = join(home, hash('@test/echo') + '.json');
+
+    for (const capabilities of [
+      ['unknown'],
+      { whenAny: ['missing'], ifTrue: ['text'], ifFalse: [] },
+      { whenAny: [], ifTrue: ['text'], ifFalse: [] },
+    ]) {
+      await writeFile(
+        registry,
+        JSON.stringify({
+          ...installed,
+          manifest: { ...installed.manifest, actions: { run: { ...installed.manifest.actions.run, capabilities } } },
+        }),
+      );
+      await expect(listInstalled(home)).rejects.toMatchObject({ code: 3 });
+    }
+    await writeFile(registry, JSON.stringify(installed));
     await removeInstalled('@test/echo', home);
     expect(await readFile(join(source, 'index.ts'), 'utf8')).toBe(code);
     expect(await listInstalled(home)).toEqual([]);

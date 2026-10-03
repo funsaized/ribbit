@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import { canonical, type Json, RibbitError } from '../../engine/records/index.ts';
 import type { Action } from '../index.ts';
+import { validateCapabilities, type Capabilities } from '../capabilities.ts';
 
 export function schemaToJson(schema: z.ZodType): Record<string, unknown> {
   const seen = new Set<z.ZodType>();
@@ -96,13 +97,12 @@ export interface ActionManifest {
   input: JsonSchema;
   output: JsonSchema;
   mode: string;
-  capabilities: string[];
+  capabilities: Capabilities;
   effects: string[];
   bindings: Binding[];
   inputKind: 'text' | 'records' | 'none' | 'any';
   outputKind: 'text' | 'records' | 'json' | 'display';
   barrier: boolean;
-  inferenceWhen?: string[];
   examples: string[];
 }
 
@@ -163,13 +163,15 @@ export function manifest(
       };
     });
 
+    if (Object.hasOwn(action, 'inferenceWhen'))
+      throw new RibbitError(2, 'Replace inferenceWhen with a conditional capability declaration');
     actions[name] = {
       description: action.description,
       args,
       input: schemaToJson(action.input),
       output: schemaToJson(action.output),
       mode: action.mode,
-      capabilities: [...action.capabilities],
+      capabilities: validateCapabilities(action.capabilities, args),
       effects: [...action.effects],
       bindings,
       inputKind: action.inputKind ?? (action.mode === 'records' ? 'records' : 'any'),
@@ -177,7 +179,6 @@ export function manifest(
         action.outputKind ?? (action.mode === 'records' ? 'records' : action.mode === 'text-stream' ? 'text' : 'json'),
       barrier: action.barrier ?? action.mode === 'value',
       examples: action.examples ?? [],
-      ...(action.inferenceWhen ? { inferenceWhen: action.inferenceWhen } : {}),
     };
   }
   const result: Manifest = {

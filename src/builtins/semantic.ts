@@ -255,7 +255,7 @@ export const semanticCommands = {
       output: recordSchema,
       inputKind: 'records',
       outputKind: 'records',
-      capabilities: ['text', 'object'],
+      capabilities: { whenAny: ['schema'], ifTrue: ['object'], ifFalse: ['text'] },
       barrier: false,
     },
   ),

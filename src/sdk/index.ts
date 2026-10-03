@@ -1,6 +1,9 @@
 import { z } from 'zod';
+import type { Capabilities } from './capabilities.ts';
 import { Budget, abortable, cancellable } from '../engine/execution/index.ts';
 import { RibbitError, isJson } from '../engine/records/index.ts';
+
+export type { Capabilities } from './capabilities.ts';
 
 export { z, Budget, RibbitError };
 
@@ -39,13 +42,12 @@ export function defineAction<
   input: I;
   output: O;
   mode: M;
-  capabilities: string[];
+  capabilities: Capabilities;
   effects: string[];
   cli?: { positionals?: string[] };
   inputKind?: 'text' | 'records' | 'none' | 'any';
   outputKind?: 'text' | 'records' | 'json' | 'display';
   barrier?: boolean;
-  inferenceWhen?: string[];
   examples?: string[];
   execute(input: { config: z.output<C>; args: z.output<A>; input: Incoming<I, M> }, ctx: Context): Outgoing<O, M>;
 }) {

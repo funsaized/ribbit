@@ -30,6 +30,7 @@ export function resolveRoute(
   layers: Partial<Record<Layer, Inference>>,
   forceProfile?: string,
   capabilities: string[] = ['text'],
+  invocation = 'Invocation',
 ): Route {
   let route: Partial<Inference> = {},
     source: Record<string, string> = {};
@@ -90,7 +91,10 @@ export function resolveRoute(
 
   for (const capability of required)
     if (!endpoint.capabilities.includes(capability as Provider['capabilities'][number]))
-      throw new RibbitError(3, `Provider does not support ${capability}`);
+      throw new RibbitError(
+        3,
+        `${invocation} requires ${capability}; provider ${route.provider}, model ${route.model}, declares [${endpoint.capabilities.join(', ')}]. Select an explicitly configured compatible route or correct the provider declaration after verifying support.`,
+      );
 
   return { ...route, provider: route.provider, model: route.model, source, endpoint };
 }
