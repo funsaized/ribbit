@@ -44,14 +44,18 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          go install github.com/junegunn/fzf@v0.74.3
+          # Tagged sources require the release linker flags (see upstream v0.74.3 Makefile).
+          go install -ldflags "-X main.version=0.74.3 -X main.revision=v0.74.3" github.com/junegunn/fzf@v0.74.3
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Install supported picker (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          go install github.com/junegunn/fzf@v0.74.3
+          go install -ldflags "-X main.version=0.74.3 -X main.revision=v0.74.3" github.com/junegunn/fzf@v0.74.3
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           "$(go env GOPATH)\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      - name: Check installed picker version
+        run: bun run scripts/ci-picker.ts
       - name: Verify native candidate
         run: bun run verify
       - name: Package and verify installed archive

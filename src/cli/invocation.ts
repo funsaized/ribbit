@@ -1,4 +1,5 @@
 import { resolveInvocation } from '../definitions/index.ts';
+import { loadDotenv } from '../config/index.ts';
 import { RibbitError, EXACT_LIMITS, SEMANTIC_LIMITS } from '../engine/records/index.ts';
 import { resolveLimits } from '../engine/execution/index.ts';
 import { resolveCapabilities } from '../sdk/capabilities.ts';
@@ -12,11 +13,15 @@ export async function prepareInvocation(tokens: string[]) {
 
   if (!name || (!explicit && (ADMIN.has(name) || name === 'flow')))
     throw new RibbitError(2, 'Expected COMMAND [arguments] or run NAME [arguments]; use flow plan for flows');
+  const args = tokens.slice(explicit ? 2 : 1);
+  const help = args.slice(0, args.indexOf('--') < 0 ? undefined : args.indexOf('--')).includes('--help');
+
+  // Dotenv can locate global definitions, but help must not depend on credential configuration.
+  if (!help) loadDotenv();
   const invocation = await resolveInvocation(name);
   const action = invocation.manifest.actions[invocation.action];
-  const args = tokens.slice(explicit ? 2 : 1);
 
-  if (args.slice(0, args.indexOf('--') < 0 ? undefined : args.indexOf('--')).includes('--help'))
+  if (help)
     return {
       help: actionHelp(explicit ? `run ${name}` : name, invocation.manifest, invocation.action, invocation.args),
     };

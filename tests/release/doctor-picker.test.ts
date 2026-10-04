@@ -8,7 +8,7 @@ test('picker version parsing rejects malformed and unsupported versions', () => 
   for (const version of ['0.74.3 (synthetic)', '0.75.0', '1.0.0'])
     expect(pickerVersion(version).status).toBe('supported');
   for (const version of ['0.74.2', '0.73.9']) expect(pickerVersion(version).status).toBe('unsupported');
-  for (const version of ['', 'unknown', '0.74', '0.74.3-rc1', '999999999999999999999.1.1'])
+  for (const version of ['', 'unknown', '0.74', '0.74 (devel)', '0.74.3-rc1', '999999999999999999999.1.1'])
     expect(pickerVersion(version).status).toBe('invalid');
 });
 
@@ -76,6 +76,7 @@ console.log(mode==='flood'?'x'.repeat(100000):mode);
         ['0.75.0', 'supported'],
         ['0.74.2', 'unsupported'],
         ['unknown', 'invalid'],
+        ['0.74 (devel)', 'invalid'],
         ['failed', 'failed'],
         ['flood', 'failed'],
         ['timeout', 'failed'],
