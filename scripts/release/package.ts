@@ -1,5 +1,5 @@
 import { cp, mkdir, readFile, writeFile, mkdtemp, rm, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createHash } from 'node:crypto';
 
@@ -52,7 +52,10 @@ try {
     ['.github', '.github'],
   ]) {
     await mkdir(join(root, destination, '..'), { recursive: true });
-    await cp(source, join(root, destination), { recursive: true });
+    await cp(source, join(root, destination), {
+      recursive: true,
+      filter: (path) => basename(path) !== '__pycache__',
+    });
   }
   const licensed = (await readdir('.')).includes('LICENSE');
 

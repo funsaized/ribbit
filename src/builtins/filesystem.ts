@@ -14,6 +14,7 @@ import { walk } from '../filesystem/index.ts';
 import { collect, textFile, recordField, recordPathParts, prompt } from './primitives.ts';
 import { semanticCommands } from './semantic.ts';
 import { executeAction } from '../sdk/index.ts';
+import { checkPicker, MIN_FZF_VERSION } from '../picker/index.ts';
 
 const config = z.strictObject({});
 const traversal = {
@@ -143,7 +144,7 @@ export const filesystemCommands = {
 
       return a.about ? about(rows, a.about, ctx) : rows;
     },
-    { cli: { positionals: ['root'] }, capabilities: ['object'], inferenceWhen: ['about'] },
+    { cli: { positionals: ['root'] }, capabilities: { whenAny: ['about'], ifTrue: ['object'], ifFalse: [] } },
   ),
   tree: command(
     'tree',
@@ -241,8 +242,7 @@ export const filesystemCommands = {
       cli: { positionals: ['root'] },
       output: jsonValueSchema,
       outputKind: 'display',
-      capabilities: ['object'],
-      inferenceWhen: ['about', 'describe'],
+      capabilities: { whenAny: ['about', 'describe'], ifTrue: ['object'], ifFalse: [] },
     },
   ),
   pick: command(
@@ -285,14 +285,10 @@ export const filesystemCommands = {
 
           rows = await collect(ranked as AsyncIterable<unknown>, 200);
         }
-        const version = Bun.spawn(['fzf', '--version'], { stdout: 'pipe', stderr: 'pipe' });
+        const picker = await checkPicker();
 
-        if ((await version.exited) !== 0) throw new RibbitError(7, 'Install fzf >=0.74.3');
-        const output = await new Response(version.stdout).text();
-        const numbers = output.split(' ')[0].split('.').map(Number);
-
-        if (numbers[0] === 0 && (numbers[1] < 74 || (numbers[1] === 74 && numbers[2] < 3)))
-          throw new RibbitError(7, 'Install fzf >=0.74.3');
+        if (picker.status !== 'supported')
+          throw new RibbitError(7, `fzf ${picker.status}; install fzf >=${MIN_FZF_VERSION}`);
         // eslint-disable-next-line no-control-regex -- intentional: escapes control characters for fzf
         const labels = rows
           .map((r, i) => {
@@ -347,8 +343,7 @@ export const filesystemCommands = {
       output: recordSchema,
       inputKind: 'records',
       outputKind: 'records',
-      capabilities: ['object'],
-      inferenceWhen: ['about'],
+      capabilities: { whenAny: ['about'], ifTrue: ['object'], ifFalse: [] },
       effects: ['process', 'terminal'],
       barrier: true,
     },

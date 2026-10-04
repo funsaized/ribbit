@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+These changes are unreleased; the latest published preview remains `0.1.0-alpha.2`.
+
+- Preserve supported external JSON Schema constraints and defaults through provider requests and runtime validation.
+- Generate CLI help from command contracts, resolve inference capabilities from invocation arguments, and inspect concrete invocations with `route inspect -- COMMAND …` and scoped `doctor`. Conditional extension declarations replace `inferenceWhen`; rebuild affected extensions explicitly. Legacy registrations remain removable.
+- Add bounded offline fixture diagnostics and checkout-only `eval:report` rendering of saved evaluation/fixture reports. Rendering does not execute commands, regrade results, or establish acceptance.
+- Pin evaluation provenance and add layered, versioned offline regrading. Recorded verdicts remain distinct from factual acceptance; unreviewed prose stays `review_required`.
+- Isolate independent CI test contracts and exclude Python `__pycache__` directories from native archives without removing source, fixtures or evaluation evidence.
+
 ## 0.1.0-alpha.2 — 2026-09-24
 
 - Added envelope field addressing, explicit projection aliases, typed `where`, and evidence-preserving named annotations without changing record wire format v1.

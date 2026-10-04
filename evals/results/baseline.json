@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "kind": "current-state-baseline",
+  "date": "2026-10-03",
+  "completedAt": "2026-10-03T17:44:48.352Z",
+  "revision": "be6e7ed90e6a5f8c4a032520ec724ef417cf784a",
+  "worktreeDirty": true,
+  "build": {
+    "schemaVersion": 1,
+    "target": "linux-x64",
+    "executable": "ribbit",
+    "runtime": "1.4.0",
+    "sourceSha256": "5d3f218e3c4ae10e7c5fc0d3837e7346536bf07b82fab885ab564902e65cea7f",
+    "lockSha256": "0b5303f2ba32b98a15f53e57bb603a8f16e97f3655f52a6e6172141e50a08d00",
+    "binarySha256": "b53290656972c98ef81f8c83a5074d16bcc354956b985a690b4f168f82b36587"
+  },
+  "evaluatorHashes": {
+    "harness.ts": "01d69f2a125d72612ac00d655ae01457bed2d4a086018061dd12948a29f1b15c",
+    "evaluate.ts": "0c5a6c23427a0a4785ccd30a1f9d215a2f05ec8503d99d9382a417393e5f087a",
+    "workflows.ts": "333182699c132f090f5f9638a3f98b18e083b003b7a4f2894231a2d28baf0d5d",
+    "handoff.ts": "b7bd23778e98c011d2217613cd877637398fbee9535513ed638e4a7000d345e7",
+    "rubric.ts": "bc8dda182c3835f0f2e65ad6139fbbe5d83c3d4d21559b4c101c95b03779f2f8",
+    "regrade.ts": "4334357027e4235598b385523e61ba5b97c85e7b0f3243a0a3a3ba100e90b5aa"
+  },
+  "fixtureHashes": {
+    "fixtures/release/feedback.jsonl": "2da245c86d17b3f0299f1dabdb9a502a92c0e021651df8b77e497f6c857e1d88",
+    "fixtures/release/meeting.txt": "7848337de55f923ab2cdedffb1a4e250053071344fad49ddabd7f1f50c0bdd25",
+    "fixtures/release/meeting.schema.json": "5dbebfa6ea7f9b44f01256786810fd0804da7609a6aff962e73d75e634e690a6",
+    "fixtures/release/before.txt": "3994edaaddbe0d085e91096ffcc59f06f37626efe71cc39e56935bf8d06bf91d",
+    "fixtures/release/after.txt": "6d46744c486e785be7287b9c8f94c966bbbf99249e3a66b812b785062a7fc7ff",
+    "fixtures/release/repository/auth.ts": "8902d269033d66aaf06fa680c76f0a24db11e001172bd65e48cf23571082afee",
+    "fixtures/release/repository/colors.ts": "062ece789a93d753678ba4c0508fb3b13e6191dce65645f8889af300a416af83",
+    "scripts/release/picker.py": "2fefcc814645dcf91de87b1e52e405cbf73e9389a410336368d6b4b670466de0",
+    "scripts/release/cases.ts": "a157ad32ecbba25bad607161b879e2cd68b6c1d0b9d01f3c4a2aa45496caf4fa"
+  },
+  "rubricVersion": "2.0.0",
+  "environment": "evals/results/baseline-environment.json",
+  "environmentSha256": "3c63a2ff1549e53627afbc027b223e40f3e6dcb1d194727f0de6b57e3fa3ce14",
+  "reports": {
+    "gemma": {
+      "path": "evals/results/release/2026-10-03T17-30-00-842Z-ribbit-baseline-gemma/report.json",
+      "sha256": "de99749b8b221ee85d8bd1d16f3d4747a485ed79c29b306f0b58b407f690626a",
+      "regrade": "evals/results/regrades/2026-10-03-baseline/gemma.json",
+      "regradeSha256": "aea25c6da2850cf6f4e3f90043e151b992e6d0c9ebff914c19ad0be0dddb69e9",
+      "attempts": 57,
+      "status": "fail",
+      "summary": {
+        "pass": 33,
+        "fail": 1,
+        "review_required": 23
+      }
+    },
+    "small": {
+      "path": "evals/results/release/2026-10-03T17-33-45-898Z-ribbit-baseline-small/report.json",
+      "sha256": "556b842adbb7ca3b867119805b738d63fa6cd61f046458a07edef237927620e1",
+      "regrade": "evals/results/regrades/2026-10-03-baseline/small.json",
+      "regradeSha256": "49d6f804b1680cc299400afc9df045c4f010d1f954d9c8ad7cc32b1156387107",
+      "attempts": 57,
+      "status": "fail",
+      "summary": {
+        "pass": 20,
+        "fail": 10,
+        "review_required": 27
+      }
+    },
+    "workflows": {
+      "path": "evals/results/workflows/2026-10-03T17-34-01-189Z/report.json",
+      "sha256": "0625b5f79c9a1691dcad5f6bc884e6529a35a2137631508231ee785aa3d084a7",
+      "regrade": "evals/results/regrades/2026-10-03-baseline/workflows.json",
+      "regradeSha256": "6acc5faae3e4f10827362810d81fd84b5de97e5ba9ae10e3aabd0bcc11ded473",
+      "attempts": 27,
+      "status": "review_required",
+      "summary": {
+        "pass": 0,
+        "fail": 0,
+        "review_required": 27
+      }
+    },
+    "handoff": {
+      "path": "evals/results/handoff/2026-10-03T17-36-24-439Z/report.json",
+      "sha256": "d88a94bf87aed815244b709b390879b0807cb7fcded3ba4386ff5ca03532e6b3",
+      "regrade": "evals/results/regrades/2026-10-03-baseline/handoff.json",
+      "regradeSha256": "861d0ffc97add30712d9ba9437536456e3a35b179631a51231a66772c09541d2",
+      "attempts": 1,
+      "status": "review_required",
+      "summary": {
+        "pass": 0,
+        "fail": 0,
+        "review_required": 1
+      }
+    }
+  },
+  "summary": {
+    "pass": 53,
+    "fail": 11,
+    "review_required": 78,
+    "total": 142
+  },
+  "status": "fail",
+  "reviews": null,
+  "verification": {
+    "date": "2026-10-03T17:55:44.452Z",
+    "status": "pass",
+    "tests": {
+      "command": "bun test tests",
+      "passed": 181,
+      "failed": 0,
+      "assertions": 1279
+    },
+    "checks": [
+      "bun run build",
+      "bun run check",
+      "bun run lint",
+      "bun run format:check",
+      "bun run package:smoke",
+      "bun run test:docs",
+      ".venv-docs/bin/mkdocs build --strict",
+      "git diff --check",
+      "Baseline source/binary/lock/evaluator/fixture hashes, report/replay digests and verdicts, completion, and request accounting"
+    ]
+  },
+  "limitations": [
+    "Fresh local inference on the current uncommitted source tree; revision identifies the base commit, not a clean shipping revision.",
+    "No source-review file was applied. Arbitrary prose facts/citations and independent human review are pending.",
+    "Passing attempts satisfy their recorded fixture criteria, not general model-quality certification.",
+    "Workflow/handoff shape and evidence-retention checks pass; their factual answers are not certified.",
+    "Raw failed attempts are retained. Token usage and selection recall remain unknown where unmeasured.",
+    "Shared workstation and uncontrolled caches/load; command proxy buffers SSE, workflow reasoning and Codex sampling use defaults.",
+    "Codex returned an answer with exit zero but reported fallback model metadata and a temporary-home helper warning.",
+    "Historical evaluation artifacts were removed from the working tree; synthetic contradiction controls are separate test fixtures."
+  ]
+}

@@ -19,6 +19,8 @@ Package boundaries: `src/sdk` is the public contract, `src/engine` handles recor
 | build | Compile the native CLI and extension support files |
 | bench | Local startup timing; writes ignored benchmark output |
 | eval:release | Opt-in local per-command model regressions |
+| eval:regrade | Offline versioned command/workflow replay; preserves original artifacts |
+| eval:report | Bounded plain-text display of saved evaluation/fixture reports; never regrades |
 | eval:workflows | Opt-in local-only, stronger-only, and mixed-model comparisons |
 | eval:handoff | Opt-in real local harness handoff |
 | package:smoke | Isolated installed CLI and extension-authoring smoke |

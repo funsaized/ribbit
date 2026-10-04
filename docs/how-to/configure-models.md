@@ -33,10 +33,12 @@ Replace the model placeholders with exact identifiers returned by your endpoint:
 ```sh
 ribbit profiles set local-small --provider local --model YOUR_SMALL_MODEL --max-output-tokens 2048
 ribbit profiles set stronger --provider local --model YOUR_STRONGER_MODEL --max-output-tokens 2048
-ribbit route inspect classify --profile local-small --json
-ribbit route inspect reduce --profile stronger --json
-ribbit doctor --probe --json
+ribbit route inspect --json -- classify --labels blocking,cosmetic,unknown --profile local-small
+ribbit route inspect --json -- reduce 'Summarize the supplied evidence' --profile stronger
+ribbit doctor --json --probe -- reduce 'Summarize the supplied evidence' --profile stronger
 ```
+
+Inspection parses the invocation but reads no task input and contacts no provider. Scoped doctor checks this route; `--probe` explicitly lists its models without performing inference. Plain `doctor` can report a missing default route even when these explicitly selected profiles work.
 
 The names describe roles in a workflow, not a guarantee about model quality. Both profiles may point to local models; while learning, they may point to the same model. Check the [model evidence](../models.md) before relying on a small model for filtering or grouping.
 

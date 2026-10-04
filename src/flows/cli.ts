@@ -64,7 +64,7 @@ export async function flowCli(tokens: string[]): Promise<void> {
     throw new RibbitError(2, 'Unknown input format');
   if (runtime['error-format'] && !['json', 'text'].includes(String(runtime['error-format'])))
     throw new RibbitError(2, 'Unknown error format');
-  const semantic = plan.steps.some((s) => s.route !== null),
+  const semantic = plan.steps.some((s) => s.inference.status !== 'exact'),
     limits = semantic ? SEMANTIC_LIMITS : EXACT_LIMITS;
   const budget = new Budget({
     ...limits,
@@ -84,7 +84,13 @@ export async function flowCli(tokens: string[]): Promise<void> {
 
   if (operation === 'validate') {
     budget.close();
-    console.log(JSON.stringify({ schemaVersion: 1, valid: true, name: plan.flow.name }));
+    const deferred = plan.steps.flatMap((step, i) =>
+      step.inference.status === 'unresolved' ? [{ id: plan.flow.steps[i].id, ...step.inference }] : [],
+    );
+
+    console.log(
+      JSON.stringify({ schemaVersion: 1, valid: true, name: plan.flow.name, complete: !deferred.length, deferred }),
+    );
 
     return;
   }
@@ -102,6 +108,7 @@ export async function flowCli(tokens: string[]): Promise<void> {
             command: s.invocation.name,
             args: s.invocation.args,
             input: s.binding,
+            inference: s.inference,
             route: s.route,
             boundary: s.barrier ? 'barrier' : 'streaming',
             effects: s.invocation.manifest.actions[s.invocation.action].effects,

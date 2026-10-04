@@ -46,9 +46,100 @@ export async function scaffold(path: string, type = `@local/${basename(resolve(p
   return { path: resolve(path), type, next: `ribbit extensions check ${path}` };
 }
 
+function preview(value: unknown) {
+  const type =
+    value === undefined ? 'missing' : value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
+  let text: string;
+
+  try {
+    text =
+      value === undefined
+        ? '<missing>'
+        : Object.is(value, -0)
+          ? '-0'
+          : JSON.stringify(value, (_key, child) =>
+              child && typeof child === 'object' && !Array.isArray(child)
+                ? Object.fromEntries(
+                    Object.keys(child)
+                      .toSorted()
+                      .map((key) => [key, child[key]]),
+                  )
+                : child,
+            );
+
+    return { type, preview: text.slice(0, 256), truncated: text.length > 256 };
+  } catch {
+    // Serialization hooks can throw or return undefined instead of JSON text.
+    return { type, preview: '<preview unavailable>', truncated: true };
+  }
+}
+
+function valueMismatch(expected: unknown, actual: unknown) {
+  let path = '',
+    depth = 0,
+    pathTruncated = false;
+
+  // ponytail: one mismatch, at most 32 levels; exhaustive diffs need a separate use case.
+  while (
+    expected !== null &&
+    actual !== null &&
+    typeof expected === 'object' &&
+    typeof actual === 'object' &&
+    Array.isArray(expected) === Array.isArray(actual)
+  ) {
+    const left = expected as Record<string, unknown>,
+      right = actual as Record<string, unknown>;
+    const keys = [...new Set([...Object.keys(left), ...Object.keys(right)])].toSorted(
+      Array.isArray(expected) ? (a, b) => Number(a) - Number(b) : undefined,
+    );
+    const key = keys.find(
+      (candidate) =>
+        Object.hasOwn(left, candidate) !== Object.hasOwn(right, candidate) ||
+        !isDeepStrictEqual(left[candidate], right[candidate]),
+    );
+
+    if (key === undefined) break;
+    const next = `${path}/${key.replaceAll('~', '~0').replaceAll('/', '~1')}`;
+
+    if (depth === 32 || next.length > 512) {
+      pathTruncated = true;
+      break;
+    }
+    path = next;
+    depth++;
+    expected = Object.hasOwn(left, key) ? left[key] : undefined;
+    actual = Object.hasOwn(right, key) ? right[key] : undefined;
+  }
+
+  return {
+    kind: 'value-mismatch' as const,
+    path,
+    ...(pathTruncated ? { pathTruncated } : {}),
+    expected: preview(expected),
+    actual: preview(actual),
+  };
+}
+
+type Outcome = { outcome: 'return' } | { outcome: 'error'; code?: number };
+type FixtureResult = {
+  file: string;
+  pass: boolean;
+  error?: number;
+  location?: string;
+  message?: string;
+  diagnostic?:
+    | ReturnType<typeof valueMismatch>
+    | { kind: 'error-mismatch'; expected: Outcome; actual: Outcome }
+    | { kind: 'execution-failure' | 'fixture-json' | 'diagnostic-unavailable' };
+};
+
+function errorOutcome(code: unknown): Outcome {
+  return { outcome: 'error', ...(typeof code === 'number' && Number.isFinite(code) ? { code } : {}) };
+}
+
 export async function testExtension(path: string) {
   const temp = await mkdtemp(join(tmpdir(), 'ribbit-fixtures-'));
-  const results: any[] = [];
+  const results: FixtureResult[] = [];
 
   try {
     const item = await addExtension(path, temp),
@@ -57,12 +148,20 @@ export async function testExtension(path: string) {
 
     if (!files.length) throw new RibbitError(2, 'No fixtures found');
     for (const file of files) {
+      // Preserve the existing fixture acceptance and error-matching rules; this is not a new schema validator.
       let fixture: any;
 
       try {
         fixture = JSON.parse(await readFile(join(path, 'fixtures', file), 'utf8'));
       } catch {
-        results.push({ file, pass: false, error: 2, location: file, message: 'Invalid fixture JSON' });
+        results.push({
+          file,
+          pass: false,
+          error: 2,
+          location: file,
+          message: 'Invalid fixture JSON',
+          diagnostic: { kind: 'fixture-json' },
+        });
         continue;
       }
       const budget = new Budget();
@@ -85,6 +184,7 @@ export async function testExtension(path: string) {
           },
         },
       };
+      let actual: unknown;
 
       try {
         let input = fixture.input;
@@ -93,29 +193,50 @@ export async function testExtension(path: string) {
           input = (async function* () {
             yield* fixture.input;
           })();
-        let actual = await dispatch(
-          command,
-          fixture.action ?? 'run',
-          input,
-          fixture.args ?? {},
-          fixture.config ?? {},
-          ctx,
-        );
+        actual = await dispatch(command, fixture.action ?? 'run', input, fixture.args ?? {}, fixture.config ?? {}, ctx);
 
-        if (actual && typeof (actual as any)[Symbol.asyncIterator] === 'function')
+        if (actual && typeof (actual as AsyncIterable<unknown>)[Symbol.asyncIterator] === 'function')
           actual = await Array.fromAsync(actual as AsyncIterable<unknown>);
-        results.push({ file, pass: !fixture.error && isDeepStrictEqual(actual, fixture.expected) });
       } catch (e) {
+        const error = e as { code?: number; location?: string };
+        const pass = fixture.error === error.code;
+
         results.push({
           file,
-          pass: fixture.error === (e as any).code,
-          error: (e as any).code ?? 5,
-          location: (e as any).location ?? file,
+          pass,
+          error: error.code ?? 5,
+          location: error.location ?? file,
           message: e instanceof RibbitError ? e.message : 'Fixture execution failed',
+          ...(!pass
+            ? {
+                diagnostic: fixture.error
+                  ? {
+                      kind: 'error-mismatch' as const,
+                      expected: errorOutcome(fixture.error),
+                      actual: errorOutcome(error.code),
+                    }
+                  : { kind: 'execution-failure' as const },
+              }
+            : {}),
         });
+        continue;
       } finally {
         budget.close();
       }
+
+      // Comparison and diagnostics must never be matched as expected execution errors.
+      const result: FixtureResult = { file, pass: false };
+
+      try {
+        result.pass = !fixture.error && isDeepStrictEqual(actual, fixture.expected);
+        if (!result.pass)
+          result.diagnostic = fixture.error
+            ? { kind: 'error-mismatch', expected: errorOutcome(fixture.error), actual: { outcome: 'return' } }
+            : valueMismatch(fixture.expected, actual);
+      } catch {
+        result.diagnostic = { kind: 'diagnostic-unavailable' };
+      }
+      results.push(result);
     }
 
     return { passed: results.filter((r) => r.pass).length, failed: results.filter((r) => !r.pass).length, results };

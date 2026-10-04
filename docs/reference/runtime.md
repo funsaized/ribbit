@@ -34,6 +34,8 @@ Exact selections (`where`, `select`, `take`, `unique`, `sort`) can return empty 
 
 `--error-format json` selects versioned JSON diagnostics on stderr. Default diagnostics are text. stdout remains the result channel. Streaming output emitted before an error is only a valid prefix, not proof of a complete result.
 
+For `doctor`, exit 0 means applicable readiness checks passed for the requested scope; exit 3 means partial/unavailable readiness even if some commands remain usable. Ordinary checks stay offline, and unverified provider/model behavior is not a failure by itself. See [doctor readiness](management.md#readiness-with-doctor).
+
 ## Statistics
 
 `--stats` writes a JSON statistics object to stderr. It includes request, repair, retry, route, token, and elapsed-time information. Exact commands make zero model requests. Token values may be unknown when the provider does not supply usage.

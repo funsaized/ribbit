@@ -1,20 +1,21 @@
 import { mkdir, writeFile, rename } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { stringify } from 'yaml';
-import { configPath, loadConfig, loadProjectInference, configSchema, providerSchema } from '../../config/index.ts';
+import { configPath, loadConfig, configSchema, providerSchema } from '../../config/index.ts';
 import { builtins, types } from '../../catalog/index.ts';
 import { definitions, resolveInvocation } from '../../definitions/index.ts';
-import { inspectRoute } from '../../routing/index.ts';
-import { routeFor } from '../../engine/runtime/index.ts';
 import { RibbitError } from '../../engine/records/index.ts';
 import { OllamaAdapter } from '../../providers/ollama/index.ts';
 import { CompatibleAdapter } from '../../providers/openai-compatible/index.ts';
 import { listInstalled, removeInstalled } from '../../extensions/install/index.ts';
 import { RUNTIME_FLAGS } from '../../sdk/manifest/index.ts';
-
-const booleanFlags = new Set(['json', 'probe', 'yes']);
+import { ADMIN, MANAGEMENT, managementBooleans } from './contract.ts';
+import { scalarTypes } from '../parser/index.ts';
+import { prepareInvocation } from '../invocation.ts';
+import { doctor, inspectInvocation } from './inspection.ts';
 
 export function options(tokens: string[], allowed: string[]) {
+  // Management handlers validate heterogeneous flag values against their own schemas.
   const flags: Record<string, any> = {},
     positionals: string[] = [];
 
@@ -28,8 +29,13 @@ export function options(tokens: string[], allowed: string[]) {
       if (!allowed.includes(name) && name !== 'json' && name !== 'error-format')
         throw new RibbitError(2, `Unknown management flag --${name}`);
       if (name in flags) throw new RibbitError(2, `Duplicate management flag --${name}`);
-      if (booleanFlags.has(name)) flags[name] = true;
-      else {
+      if (managementBooleans.has(name)) {
+        const value = eq < 0 ? undefined : token.slice(eq + 1);
+
+        if (value !== undefined && !['true', 'false'].includes(value))
+          throw new RibbitError(2, `--${name} expects true or false`);
+        flags[name] = value !== 'false';
+      } else {
         const value = eq < 0 ? tokens[++i] : token.slice(eq + 1);
 
         if (value === undefined) throw new RibbitError(2, `--${name} requires a value`);
@@ -64,37 +70,25 @@ export function respond(value: unknown, json: boolean) {
   );
 }
 
-export const ADMIN = new Set([
-  'providers',
-  'profiles',
-  'models',
-  'route',
-  'commands',
-  'types',
-  'extensions',
-  'init',
-  'completions',
-  'setup',
-  'doctor',
-]);
-
 export async function admin(command: string, tokens: string[]): Promise<void> {
-  const { flags: f, positionals: p } = options(tokens, [
-    'type',
-    'base-url',
-    'default-model',
-    'api-key-env',
-    'capabilities',
-    'provider',
-    'model',
-    'profile',
-    'temperature',
-    'max-output-tokens',
-    'timeout',
-    'probe',
-    'agent',
-    'yes',
-  ]);
+  const operations = MANAGEMENT[command];
+  const separator = ['route', 'doctor'].includes(command) ? tokens.indexOf('--') : -1;
+
+  if (command === 'route' && separator < 0)
+    throw new RibbitError(2, 'Use route inspect [--json] -- COMMAND [arguments]; target route flags belong after --');
+  const target = separator < 0 ? undefined : tokens.slice(separator + 1);
+
+  if (target && !target.length) throw new RibbitError(2, 'A command is required after --');
+  const { flags: f, positionals: p } = options(
+    separator < 0 ? tokens : tokens.slice(0, separator),
+    Object.values(operations).flatMap((op) => op.flags),
+  );
+  const contract = operations[p[0] ?? (operations[''] ? '' : 'list')];
+
+  if (!contract) throw new RibbitError(2, `Use ribbit ${command} --help`);
+  for (const flag of Object.keys(f))
+    if (!['json', 'error-format'].includes(flag) && !contract.flags.includes(flag))
+      throw new RibbitError(2, `Unknown management flag --${flag} for this operation`);
 
   if (f['error-format'] && !['json', 'text'].includes(f['error-format']))
     throw new RibbitError(2, 'Unknown error format');
@@ -103,6 +97,35 @@ export async function admin(command: string, tokens: string[]): Promise<void> {
     json = !!f.json;
   const result = (value: unknown) => respond(value, json);
 
+  if (command === 'route' || command === 'doctor') {
+    if ((command === 'route' && (p.length !== 1 || p[0] !== 'inspect')) || (command === 'doctor' && p.length))
+      throw new RibbitError(
+        2,
+        `Use ${command === 'route' ? 'route inspect' : 'doctor'} [options] -- COMMAND [arguments]`,
+      );
+    const prepared = command === 'route' ? await prepareInvocation(target!) : undefined;
+
+    if (prepared && 'help' in prepared) {
+      console.log(prepared.help);
+
+      return;
+    }
+    if (command === 'route') result(await inspectInvocation(prepared!));
+    else {
+      const report = await doctor(target, f.probe === true);
+
+      if ('help' in report) {
+        console.log(report.help);
+
+        return;
+      }
+      result(report);
+      if (!report.ok) process.exitCode = 3;
+    }
+
+    return;
+  }
+
   if (command === 'completions') {
     if (!['bash', 'zsh', 'fish'].includes(operation)) throw new RibbitError(2, 'Choose bash, zsh or fish');
     const named = (await definitions()).flatMap((d) => [d.value.name, `${d.scope}:${d.value.name}`]);
@@ -110,8 +133,15 @@ export async function admin(command: string, tokens: string[]): Promise<void> {
     const flags = [
       ...new Set([
         ...[...RUNTIME_FLAGS].map((flag) => '--' + flag),
+        '--json',
+        '--error-format',
+        ...Object.values(MANAGEMENT).flatMap((entries) =>
+          Object.values(entries).flatMap((op) => op.flags.map((flag) => '--' + flag)),
+        ),
         ...(await types()).flatMap((m) =>
-          Object.values(m.actions).flatMap((a) => a.bindings.map((b) => '--' + b.flag)),
+          Object.values(m.actions).flatMap((a) =>
+            a.bindings.filter((b) => scalarTypes.has(b.type)).map((b) => '--' + b.flag),
+          ),
         ),
       ]),
     ].join(' ');
@@ -302,26 +332,6 @@ export async function admin(command: string, tokens: string[]): Promise<void> {
 
     return;
   }
-  if (command === 'route') {
-    if (operation !== 'inspect' || !name) throw new RibbitError(2, 'Use route inspect COMMAND');
-    const invocation = await resolveInvocation(name);
-    const route = routeFor(invocation, config, {
-      project: await loadProjectInference(join(process.cwd(), '.ribbit.yaml')),
-      cli: {
-        ...(f.profile ? { profile: f.profile } : {}),
-        ...(f.provider ? { provider: f.provider } : {}),
-        ...(f.model ? { model: f.model } : {}),
-      },
-    });
-
-    result(
-      route
-        ? inspectRoute(route)
-        : { inference: false, effects: invocation.manifest.actions[invocation.action].effects },
-    );
-
-    return;
-  }
   if (command === 'setup') {
     const discovered = [];
 
@@ -351,38 +361,6 @@ export async function admin(command: string, tokens: string[]): Promise<void> {
       downloadPerformed: false,
       next: 'Use providers add and profiles set with an installed model. No configuration was changed.',
     });
-
-    return;
-  }
-  if (command === 'doctor') {
-    const checks: any[] = [{ name: 'configuration', ok: true }];
-    const picker = Bun.which('fzf');
-
-    checks.push({ name: 'picker', ok: !!picker });
-    for (const extension of await listInstalled()) {
-      const { sourceDigest } = await import('../../extensions/install/index.ts');
-      let ok = false;
-
-      try {
-        ok = (await sourceDigest(extension.source)) === extension.manifest.sourceHash;
-      } catch {}
-      checks.push({ name: extension.manifest.type, ok });
-    }
-    if (f.probe)
-      for (const [providerName, provider] of Object.entries(config.providers)) {
-        try {
-          const models = await (provider.type === 'ollama' ? new OllamaAdapter() : new CompatibleAdapter()).models(
-            provider,
-            AbortSignal.timeout(3000),
-          );
-
-          checks.push({ name: providerName, ok: true, models, capabilities: provider.capabilities });
-        } catch {
-          checks.push({ name: providerName, ok: false });
-        }
-      }
-    result({ checks, ok: checks.every((c) => c.ok) });
-    if (checks.some((c) => !c.ok)) process.exitCode = 3;
 
     return;
   }

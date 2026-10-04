@@ -18,6 +18,15 @@ export const DEFAULT_BUDGET: BudgetLimits = {
   maxRecords: 10_000,
 };
 
+export function resolveLimits(limits: Partial<BudgetLimits> = {}): BudgetLimits {
+  const resolved = { ...DEFAULT_BUDGET, ...limits };
+
+  for (const [key, value] of Object.entries(resolved))
+    if (!Number.isSafeInteger(value) || value < 1) throw new RibbitError(2, `${key} must be a positive integer`);
+
+  return resolved;
+}
+
 export class Budget {
   readonly started = performance.now();
   readonly controller = new AbortController();
@@ -36,9 +45,7 @@ export class Budget {
   private tail: Promise<void> = Promise.resolve();
   private onAbort = () => this.controller.abort(new RibbitError(130, 'Cancelled'));
   constructor(limits: Partial<BudgetLimits> = {}, external?: AbortSignal) {
-    this.limits = { ...DEFAULT_BUDGET, ...limits };
-    for (const [key, value] of Object.entries(this.limits))
-      if (!Number.isSafeInteger(value) || value < 1) throw new RibbitError(2, `${key} must be a positive integer`);
+    this.limits = resolveLimits(limits);
     this.timer = setTimeout(
       () => this.controller.abort(new RibbitError(6, 'Total command deadline exceeded')),
       this.limits.totalMs,

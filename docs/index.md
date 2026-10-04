@@ -2,6 +2,8 @@
 
 Ribbit is an extensible framework for composing model tasks into reusable commands, with typed contracts and inspectable evidence. It reads UTF-8 text, JSON values, JSONL, files, and tool output. Keep the evidence, choose a route for each semantic step, and pass the result to another command or a coding harness.
 
+These docs describe the source checkout. The latest published preview is **0.1.0-alpha.2**; the [unreleased changelog](../CHANGELOG.md#unreleased) lists changes not yet in the npm alpha or published native archives.
+
 **New to Ribbit? Start with [your first pipeline](tutorials/first-pipeline.md).** It needs no model, account, or provider configuration.
 
 | What you need | Where to go |

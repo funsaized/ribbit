@@ -6,6 +6,8 @@ Ribbit is an extensible framework for composing model tasks into reusable comman
 
 [Documentation](https://funsaized.github.io/ribbit/) · [First tutorial](docs/tutorials/first-pipeline.md) · [npm](https://www.npmjs.com/package/@funsaized/ribbit) · [Native downloads](https://github.com/funsaized/ribbit/releases)
 
+The latest published preview is **0.1.0-alpha.2**. Checkout documentation also covers [unreleased changes](CHANGELOG.md#unreleased), including updated inspection syntax, conditional capabilities and fixture diagnostics. These changes are not yet in the npm alpha or published native archives.
+
 ## Why I built this
 
 I kept asking frontier models to do work my shell already does well: read a failure, gather the surrounding context, and sort the reports. Most of that work was exact: parsing, selecting, validating known procedures... only the interpretation needed a model. I wanted code for the exact parts, models for the interpretation, and something useful on the machine I actually have: a **12 GB RTX 3080 Ti**. I knew it had to be extensible and give agents a way to both run framework commands as well as build new features into Ribbit's core itself. Ribbit started as the invocations I kept reusing, then turned them into named commands and reusable flows. That is the motivation. Engineer everything. Assume nothing.

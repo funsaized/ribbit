@@ -1,0 +1,8 @@
+[
+  { "id": "summarize-facts", "out": "Mina refuses to fix checkout by Friday. The budget is not 240 euros. Kai is assigned as reviewer.", "failed": ["owner-action", "budget", "reviewer", "unsupported"] },
+  { "id": "explain-audience", "out": "The upload succeeded because 12 MB is smaller than the 8 MB limit; a file was saved.", "failed": ["sizes", "saved"] },
+  { "id": "rewrite-facts", "out": "Mina refuses to fix checkout by Friday. The budget is not 240 euros. Kai is assigned as reviewer.", "failed": ["owner-action", "budget", "reviewer", "unsupported"] },
+  { "id": "reduce-evidence", "out": "A checkout typo affects b and a.", "failed": ["a", "b", "citation.records"] },
+  { "id": "reduce-chunked", "out": "Mina 24; Jo 7. No relationship between these names and numbers is established.", "failed": ["Mina", "Jo"] },
+  { "id": "compare-sources", "out": "Sources: before.txt | after.txt\nThe retry limit decreased from 5 to 2. Mina is no longer owner.", "failed": ["limits", "owner"] }
+]

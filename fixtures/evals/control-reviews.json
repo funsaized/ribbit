@@ -1,0 +1,265 @@
+{
+  "schemaVersion": 1,
+  "rubricVersion": "2.0.1",
+  "entries": [
+    {
+      "id": "summarize-facts",
+      "caseSha256": "b4b768a3fedba16b72be6f57b0dbd23e648c40c0bcd42c2f37b4f790b03c1da6",
+      "outputSha256": "e9b26d4794a9a3d5ccfa0a5664c5678cae9c76686135db107cbd6db6f1c302d7",
+      "reviewer": {
+        "kind": "ai",
+        "name": "coding-assistant/source-review (audit F01 and saved transcripts)"
+      },
+      "judgments": [
+        {
+          "criterion": "owner-action",
+          "actual": {
+            "owner": "Mina",
+            "action": "refuses to fix checkout"
+          },
+          "quote": "Mina refuses to fix checkout by Friday. The budget is not 240 euros. Kai is assigned as reviewer.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "deadline",
+          "actual": {
+            "relation": "by",
+            "day": "Friday"
+          },
+          "quote": "Mina refuses to fix checkout by Friday. The budget is not 240 euros. Kai is assigned as reviewer.",
+          "reason": "Read the complete output against the pinned source facts; this relation is preserved and no contradictory assertion was found for this criterion."
+        },
+        {
+          "criterion": "budget",
+          "actual": {
+            "amount": 240,
+            "currency": "EUR",
+            "negated": true
+          },
+          "quote": "x checkout by Friday. The budget is not 240 euros. Kai is assigned as reviewer.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "reviewer",
+          "actual": {
+            "assigned": true,
+            "name": "Kai"
+          },
+          "quote": "et is not 240 euros. Kai is assigned as reviewer.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "unsupported",
+          "actual": [
+            "Mina refuses the fix",
+            "Budget is negated",
+            "Kai is assigned as reviewer"
+          ],
+          "quote": "Mina refuses to fix checkout by Friday. The budget is not 240 euros. Kai is assigned as reviewer.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        }
+      ]
+    },
+    {
+      "id": "explain-audience",
+      "caseSha256": "4c5ef0d65a27c86f7f0b7099e54a98b484843f8b27907cfacb4f993afd909488",
+      "outputSha256": "ef1629756436a3a3ef6a6cede5d170e2e1b949adc5205edfd8e15e256b338b02",
+      "reviewer": {
+        "kind": "ai",
+        "name": "coding-assistant/source-review (audit F01 and saved transcripts)"
+      },
+      "judgments": [
+        {
+          "criterion": "sizes",
+          "actual": {
+            "file": 12,
+            "limit": 8,
+            "unit": "MB",
+            "comparison": "<"
+          },
+          "quote": "The upload succeeded because 12 MB is smaller than the 8 MB limit; a file was saved.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "saved",
+          "actual": true,
+          "quote": "smaller than the 8 MB limit; a file was saved.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "unsupported",
+          "actual": [
+            "12 MB is smaller than 8 MB",
+            "A file was saved"
+          ],
+          "quote": "The upload succeeded because 12 MB is smaller than the 8 MB limit; a file was saved.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        }
+      ]
+    },
+    {
+      "id": "rewrite-facts",
+      "caseSha256": "f9c07965642759e732b1c3038ab90d6ac80e7693594d9c6cad0f4b016ee66644",
+      "outputSha256": "e9b26d4794a9a3d5ccfa0a5664c5678cae9c76686135db107cbd6db6f1c302d7",
+      "reviewer": {
+        "kind": "ai",
+        "name": "coding-assistant/source-review (audit F01 and saved transcripts)"
+      },
+      "judgments": [
+        {
+          "criterion": "owner-action",
+          "actual": {
+            "owner": "Mina",
+            "action": "refuses to fix checkout"
+          },
+          "quote": "Mina refuses to fix checkout by Friday. The budget is not 240 euros. Kai is assigned as reviewer.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "deadline",
+          "actual": {
+            "relation": "by",
+            "day": "Friday"
+          },
+          "quote": "Mina refuses to fix checkout by Friday. The budget is not 240 euros. Kai is assigned as reviewer.",
+          "reason": "Read the complete output against the pinned source facts; this relation is preserved and no contradictory assertion was found for this criterion."
+        },
+        {
+          "criterion": "budget",
+          "actual": {
+            "amount": 240,
+            "currency": "EUR",
+            "negated": true
+          },
+          "quote": "x checkout by Friday. The budget is not 240 euros. Kai is assigned as reviewer.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "reviewer",
+          "actual": {
+            "assigned": true,
+            "name": "Kai"
+          },
+          "quote": "et is not 240 euros. Kai is assigned as reviewer.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "unsupported",
+          "actual": [
+            "Mina refuses the fix",
+            "Budget is negated",
+            "Kai is assigned as reviewer"
+          ],
+          "quote": "Mina refuses to fix checkout by Friday. The budget is not 240 euros. Kai is assigned as reviewer.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        }
+      ]
+    },
+    {
+      "id": "reduce-evidence",
+      "caseSha256": "aa254c5c0e54d3ca312c5d65c85dbeba0349980bbc5db6d07a47446908861a7d",
+      "outputSha256": "569938e52d01d837ddd87a7d9a1ae0000c3429efdcd210565a6ead2f4188db0e",
+      "reviewer": {
+        "kind": "ai",
+        "name": "coding-assistant/source-review (audit F01 and saved transcripts)"
+      },
+      "judgments": [
+        {
+          "criterion": "a",
+          "actual": {
+            "checkout": "typo"
+          },
+          "quote": "A checkout typo affects b and a.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "b",
+          "actual": null,
+          "quote": "A checkout typo affects b and a.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "citation.records",
+          "actual": [],
+          "quote": "A checkout typo affects b and a.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "unsupported",
+          "actual": [
+            "Checkout has a typo"
+          ],
+          "quote": "A checkout typo affects b and a.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        }
+      ]
+    },
+    {
+      "id": "reduce-chunked",
+      "caseSha256": "59f042677efd9488ff6f391222747186ab7e0bc0012976374c7f1f48eea22414",
+      "outputSha256": "2b1c08da637878f8f9d11bd20ebca4e4a4ecfc041c04ca51525e1e0735c4a186",
+      "reviewer": {
+        "kind": "ai",
+        "name": "coding-assistant/source-review (audit F01 and saved transcripts)"
+      },
+      "judgments": [
+        {
+          "criterion": "Mina",
+          "actual": null,
+          "quote": "Mina 24; Jo 7. No relationship between these names and numbers is established.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "Jo",
+          "actual": null,
+          "quote": "Mina 24; Jo 7. No relationship between these names and numbers is established.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "unsupported",
+          "actual": [],
+          "quote": "Mina 24; Jo 7. No relationship between these names and numbers is established.",
+          "reason": "Read the complete output against the pinned source facts; this relation is preserved and no contradictory assertion was found for this criterion."
+        }
+      ]
+    },
+    {
+      "id": "compare-sources",
+      "caseSha256": "868557e2369b6567de01e28c0a1a873b23ffc05fb793f5e8b71bbb8cc9d647bc",
+      "outputSha256": "ff6a2dd57cafd2f114fecca4b96ecbe97d38b9042ae2b96aeb916d34848b8184",
+      "reviewer": {
+        "kind": "ai",
+        "name": "coding-assistant/source-review (audit F01 and saved transcripts)"
+      },
+      "judgments": [
+        {
+          "criterion": "limits",
+          "actual": {
+            "before": 5,
+            "after": 2
+          },
+          "quote": "Sources: before.txt | after.txt\nThe retry limit decreased from 5 to 2. Mina is no longer owner.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "owner",
+          "actual": {
+            "before": "Mina",
+            "after": null
+          },
+          "quote": "\nThe retry limit decreased from 5 to 2. Mina is no longer owner.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        },
+        {
+          "criterion": "unsupported",
+          "actual": [
+            "Retry limit decreased from 5 to 2",
+            "Mina is no longer owner"
+          ],
+          "quote": "Sources: before.txt | after.txt\nThe retry limit decreased from 5 to 2. Mina is no longer owner.",
+          "reason": "Read the complete output against the pinned source facts; this transcribed relation is missing or contradicts the original. The quoted span is diagnostic; the output hash binds the full reviewed text."
+        }
+      ]
+    }
+  ]
+}

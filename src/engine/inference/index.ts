@@ -4,6 +4,7 @@ import { RibbitError } from '../records/index.ts';
 import { type Adapter, TransportError } from '../../providers/interface/index.ts';
 import type { Route } from '../../routing/index.ts';
 import { schemaToJson } from '../../sdk/manifest/index.ts';
+import { externalJsonSchema } from '../../build/schema/index.ts';
 
 export { schemaToJson };
 
@@ -95,7 +96,7 @@ export class ManagedInference {
     return this.attempt(instruction, evidence);
   }
   async object<T>(instruction: string, evidence: string, schema: z.ZodType<T>): Promise<T> {
-    const exported = schemaToJson(schema);
+    const exported = externalJsonSchema(schema) ?? schemaToJson(schema);
 
     this.preflight(instruction, evidence, true);
     for (let repair = 0; repair <= 1; repair++) {

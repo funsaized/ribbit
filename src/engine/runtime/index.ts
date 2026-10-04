@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { type Context, Budget } from '../../sdk/index.ts';
 import { type RecordValue, RibbitError, validateRecord } from '../records/index.ts';
-import { type Manifest, type ActionManifest } from '../../sdk/manifest/index.ts';
+import { type Manifest } from '../../sdk/manifest/index.ts';
 import { loadProjectInference, type Config, type Inference } from '../../config/index.ts';
 import { resolveRoute, commandRoute, type Layer, type Route } from '../../routing/index.ts';
 import { ManagedInference } from '../inference/index.ts';
@@ -11,6 +11,7 @@ import { dispatch } from '../../extensions/runtime/index.ts';
 import { loadInstalled } from '../../extensions/install/index.ts';
 import { builtins } from '../../catalog/index.ts';
 import { collect } from '../../builtins/primitives.ts';
+import { resolveCapabilities } from '../../sdk/capabilities.ts';
 
 export type Data =
   | { kind: 'records'; records: AsyncIterable<RecordValue> }
@@ -26,8 +27,16 @@ export interface Invocation {
   inference?: Inference;
 }
 
-export function requiresInference(action: ActionManifest, args: Record<string, any>) {
-  return action.capabilities.length > 0 && (!action.inferenceWhen || action.inferenceWhen.some((key) => !!args[key]));
+export function invocationLayers(
+  invocation: Invocation,
+  config: Config,
+  layers: Partial<Record<Layer, Inference>> = {},
+) {
+  return {
+    perCommand: commandRoute(config, invocation.name, `${invocation.manifest.type}/${invocation.action}`),
+    definition: invocation.inference,
+    ...layers,
+  };
 }
 
 export function routeFor(
@@ -38,17 +47,17 @@ export function routeFor(
 ): Route | undefined {
   const action = invocation.manifest.actions[invocation.action];
 
-  if (!requiresInference(action, invocation.args)) return undefined;
+  const requirements = resolveCapabilities(action, invocation.args);
+
+  if (requirements.status === 'exact') return undefined;
+  if (requirements.status === 'unresolved') throw new RibbitError(2, 'Resolve capability arguments before routing');
 
   return resolveRoute(
     config,
-    {
-      perCommand: commandRoute(config, invocation.name, `${invocation.manifest.type}/${invocation.action}`),
-      definition: invocation.inference,
-      ...layers,
-    },
+    invocationLayers(invocation, config, layers),
     force,
-    action.capabilities,
+    requirements.capabilities,
+    `${invocation.name}/${invocation.action}`,
   );
 }
 
@@ -67,7 +76,14 @@ export async function runInvocation(
   if (!action) throw new RibbitError(2, 'Unknown action');
   let llm: ManagedInference | undefined;
 
-  function inference() {
+  function inference(capability: 'text' | 'object') {
+    const requirements = resolveCapabilities(action, invocation.args);
+
+    if (requirements.status === 'unresolved' || !requirements.capabilities.includes(capability))
+      throw new RibbitError(
+        3,
+        `${invocation.name}/${invocation.action} did not declare ${capability} for these arguments`,
+      );
     if (!llm) {
       const route = routeFor(invocation, config, layers, force);
 
@@ -89,8 +105,8 @@ export async function runInvocation(
     signal: budget.signal,
     log,
     llm: {
-      text: (instruction, evidence) => inference().text(instruction, evidence),
-      object: (instruction, evidence, schema) => inference().object(instruction, evidence, schema),
+      text: (instruction, evidence) => inference('text').text(instruction, evidence),
+      object: (instruction, evidence, schema) => inference('object').object(instruction, evidence, schema),
     },
   };
 

@@ -1,21 +1,10 @@
 import { version } from '../../package.json';
 import { builtins } from '../catalog/index.ts';
-import { RibbitError, EXACT_LIMITS, SEMANTIC_LIMITS } from '../engine/records/index.ts';
+import { RibbitError } from '../engine/records/index.ts';
+import { ADMIN } from './admin/contract.ts';
+import { actionHelp, managementHelp, flowHelp } from './help.ts';
 
 const argv = process.argv.slice(2);
-const administrative = [
-  'providers',
-  'profiles',
-  'models',
-  'route',
-  'commands',
-  'types',
-  'extensions',
-  'init',
-  'completions',
-  'setup',
-  'doctor',
-];
 
 function help(
   name?: string,
@@ -23,24 +12,23 @@ function help(
   actionName = 'run',
   defaults: Record<string, unknown> = {},
 ) {
-  if (name === 'flow') {
-    console.log(
-      'Usage: ribbit flow run|plan|validate FILE [runtime flags]\n       ribbit flow run|plan|validate [runtime flags] -- COMMAND [args] :: COMMAND [args]\n\nPlan and validate check references without inference. Run executes the flow.\nUse --profile as a flow default, segment --profile to override, or --force-profile to replace all routes.',
-    );
+  if (name && manifest) {
+    console.log(actionHelp(name, manifest, actionName, defaults));
 
     return;
   }
-  if (name && manifest) {
-    const action = manifest.actions[actionName];
+  if (name === 'flow') {
+    console.log(flowHelp());
 
-    console.log(
-      `ribbit ${name} — ${action.description}\n\nType: ${manifest.type}\nAction: ${actionName}\nDefaults: ${JSON.stringify(defaults)}\n\n${action.bindings.map((b) => `  --${b.flag}${b.type === 'boolean' ? '' : ` <${b.type}>`}${b.repeated ? ' (repeatable)' : ''}${b.positional !== undefined ? ' (positional)' : ''}`).join('\n')}\n\nInput: ${action.inputKind}; output: ${action.outputKind}.\nRuntime: --input auto|text|lines|jsonl|records, --output records|jsonl|text|json,\n--file PATH, --profile NAME, --provider NAME, --model NAME, --stats, --error-format json.\n`,
-    );
+    return;
+  }
+  if (name && ADMIN.has(name)) {
+    console.log(managementHelp(name, argv[1]?.startsWith('--') ? undefined : argv[1]));
 
     return;
   }
   console.log(
-    `Ribbit — Small commands. Big hops.\n\nUsage: ribbit COMMAND [arguments]\n\nCommands:\n  ${Object.keys(builtins).join(', ')}\n\nManagement:\n  ${administrative.join(', ')}, run, flow\n\nUse ribbit COMMAND --help or ribbit types describe @ribbit/COMMAND --json.`,
+    `Ribbit — Small commands. Big hops.\n\nUsage: ribbit COMMAND [arguments]\n\nCommands:\n  ${Object.keys(builtins).join(', ')}\n\nManagement:\n  ${[...ADMIN].join(', ')}, run, flow\n\nUse ribbit COMMAND --help or ribbit types describe @ribbit/COMMAND --json.`,
   );
 }
 
@@ -56,20 +44,29 @@ async function main() {
     return;
   }
   if (argv.slice(0, argv.indexOf('--') < 0 ? undefined : argv.indexOf('--')).includes('--help')) {
+    if (argv[0] === 'run' && (!argv[1] || argv[1].startsWith('--'))) {
+      console.log(
+        'Usage: ribbit run COMMAND [arguments] [runtime flags]\nUse ribbit run COMMAND --help for its contract.',
+      );
+
+      return;
+    }
     const name = argv[0] === 'run' ? argv[1] : argv[0];
 
-    if (name && !builtins[name] && !administrative.includes(name) && name !== 'flow') {
+    if (name && (argv[0] === 'run' || (!builtins[name] && !ADMIN.has(name) && name !== 'flow'))) {
       const invocation = await (await import('../definitions/index.ts')).resolveInvocation(name);
 
-      help(name, invocation.manifest, invocation.action, invocation.args);
+      help(argv[0] === 'run' ? `run ${name}` : name, invocation.manifest, invocation.action, invocation.args);
     } else help(name);
 
     return;
   }
-  (await import('../config/index.ts')).loadDotenv();
   const command = argv[0];
 
-  if (administrative.includes(command)) {
+  // Invocation inspection handles target help before loading credential configuration.
+  if (!['route', 'doctor'].includes(command)) (await import('../config/index.ts')).loadDotenv();
+
+  if (ADMIN.has(command)) {
     await (await import('./admin/index.ts')).admin(command, argv.slice(1));
 
     return;
@@ -79,38 +76,18 @@ async function main() {
 
     return;
   }
-  const { resolveInvocation } = await import('../definitions/index.ts');
-  const invocation = await resolveInvocation(command === 'run' ? (argv[1] ?? '') : command);
-  const { parseAction } = await import('./parser/index.ts');
-  const parsed = parseAction(
-    argv.slice(command === 'run' ? 2 : 1),
-    invocation.manifest.actions[invocation.action],
-    invocation.args,
-  );
+  const { prepareInvocation } = await import('./invocation.ts');
+  const prepared = await prepareInvocation(argv);
 
-  invocation.args = parsed.args;
-  if (parsed.runtime['force-profile']) throw new RibbitError(2, '--force-profile applies only to flows');
-  const runtime = parsed.runtime,
-    action = invocation.manifest.actions[invocation.action];
+  if ('help' in prepared) {
+    console.log(prepared.help);
 
-  if (runtime['error-format'] && !['json', 'text'].includes(String(runtime['error-format'])))
-    throw new RibbitError(2, 'Unknown error format');
-  if (runtime.output && !['records', 'jsonl', 'text', 'json'].includes(String(runtime.output)))
-    throw new RibbitError(2, 'Unknown output format');
-  if (action.outputKind === 'records' && runtime.output && !['records', 'jsonl'].includes(String(runtime.output)))
-    throw new RibbitError(2, 'Use render for record display');
-  const { requiresInference, runInvocation } = await import('../engine/runtime/index.ts');
-  const semantic = requiresInference(action, parsed.args);
+    return;
+  }
+  const { invocation, runtime, action, semantic, limits, cli } = prepared;
+  const { runInvocation } = await import('../engine/runtime/index.ts');
   const { Budget } = await import('../engine/execution/index.ts');
-  const limits = semantic ? SEMANTIC_LIMITS : EXACT_LIMITS;
-  const budget = new Budget({
-    maxBytes: Number(runtime['max-bytes'] ?? limits.maxBytes),
-    maxRecords: Number(runtime['max-records'] ?? limits.maxRecords),
-    ...(runtime['max-requests'] === undefined ? {} : { maxRequests: Number(runtime['max-requests']) }),
-    ...(runtime['max-tokens'] === undefined ? {} : { maxTokens: Number(runtime['max-tokens']) }),
-    ...(runtime['total-ms'] === undefined ? {} : { totalMs: Number(runtime['total-ms']) }),
-    ...(runtime['request-ms'] === undefined ? {} : { requestMs: Number(runtime['request-ms']) }),
-  });
+  const budget = new Budget(limits);
   const cancel = () => budget.controller.abort(new RibbitError(130, 'Cancelled'));
 
   process.once('SIGINT', cancel);
@@ -121,15 +98,10 @@ async function main() {
     const input = await io.readInput(
       runtime,
       action,
-      parsed.args,
+      invocation.args,
       semantic,
-      invocation.name === 'take' && parsed.args.count === 0,
+      invocation.name === 'take' && invocation.args.count === 0,
     );
-    const cli = {
-      ...(runtime.profile ? { profile: String(runtime.profile) } : {}),
-      ...(runtime.provider ? { provider: String(runtime.provider) } : {}),
-      ...(runtime.model ? { model: String(runtime.model) } : {}),
-    };
     const result = await runInvocation(invocation, input, budget, config, { cli });
 
     await io.write(io.output(result, runtime, invocation.name));
