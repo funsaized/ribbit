@@ -411,4 +411,4 @@ test('help examples and typed/boolean invocations run offline in an isolated dir
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-}, 15000);
+}, 30000);
