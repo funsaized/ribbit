@@ -74,7 +74,7 @@ test('group requires a complete partition and reduce reports actual calls', asyn
 
   expect(reduced).toEqual({ value: 'combined', calls: 3 });
 });
-test('schema extraction, explicit file comparison and safe templates', async () => {
+test('schema extraction retains declared behavior', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'ribbit-families-'));
 
   try {
@@ -92,12 +92,28 @@ test('schema extraction, explicit file comparison and safe templates', async () 
     expect(
       (await invoke('extract', 'A title', { instruction: 'extract', schema }, [{ title: 'A title' }])).value,
     ).toEqual({ title: 'A title' });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+test('explicit file comparison identifies both sources', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ribbit-families-'));
+
+  try {
     const a = join(dir, 'a.txt'),
       b = join(dir, 'b.txt');
 
     await writeFile(a, 'before');
     await writeFile(b, 'after');
     expect((await invoke('compare', null, { paths: [a, b] }, ['changed'])).value).toContain(`Sources: ${a} | ${b}`);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+test('safe templates support record-envelope addressing only for records', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ribbit-families-'));
+
+  try {
     const template = join(dir, 'template.txt');
 
     await writeFile(template, 'Title: {{title}} $(touch NEVER)');
