@@ -21,9 +21,53 @@ Gemma's failed `tree-describe` attempt exited 4 because description IDs did not 
 
 Superseded raw runs, corrected originals, old derived verdicts, and reviews bound to those outputs have been removed from the working tree. The six [synthetic contradiction controls](../fixtures/evals/contradictions.json) and their [AI-labeled test reviews](../fixtures/evals/control-reviews.json) remain regression fixtures, not model-run evidence. Offline tests generate their own transcripts and do not depend on saved model runs.
 
+## Read a saved report offline
+
+From a repository checkout with Bun 1.4.0 and dependencies installed (`bun install --frozen-lockfile --ignore-scripts`), render recorded results as plain text:
+
+```sh
+bun run eval:report -- evals/results/regrades/2026-10-03-baseline/gemma.json
+bun run eval:report -- evals/results/workflows/2026-10-03T17-34-01-189Z/report.json --output workflow-report.txt
+```
+
+This is a checkout script, not a command in the npm-installed `ribbit` executable. No executable build, provider configuration, credentials, or inference is needed. It reads only the named report: recorded commands are never executed, extensions are never imported, and embedded paths/URLs are never opened. Artifact references are inert JSON Pointers into the input, not verified links. Use the explicit regrade workflow below to produce new grades; rendering never calls a grader or substitutes the current rubric.
+
+Supported inputs:
+
+- Command and workflow evaluation reports with `schemaVersion: 1` or `2`, including legacy corrected reports with `derivation` metadata.
+- Version-1 root-level handoff results and version-2 handoff evaluation reports. A legacy root result is displayed once; missing repetition remains unknown.
+- Version-2 `kind: "offline-regrade"` reports, preserving their original rubric, historical verdicts, source indices, and recorded hashes.
+- Version-1 saved `ribbit extensions test PATH --json` reports, including older failures without diagnostics. See [fixture diagnostics](../docs/extensions.md#offline-fixture-diagnostics).
+
+Baseline manifests, environment inventories, review-input files, unknown kinds/versions, and unversioned fixture output are not supported. Malformed JSON, invalid UTF-8, and invalid known field types are errors. Missing completion/provenance fields and empty result arrays are rendered with explicit unknown states or warnings rather than treated as successes.
+
+The header shows recorded completion and acceptance before failures and pending review. Raw evaluation completion uses the final top-level `pass` marker; an offline regrade shows `sourceCompletion` separately from its derived status. Fixture completion uses recorded totals. These markers describe the saved report, not independent proof that all planned work ran. A missing marker leaves completion unknown, even if all recorded attempts pass. Zero attempts, missing criteria, mismatched totals, inconsistent verdicts, and missing/duplicate declared repetitions cannot establish acceptance. The renderer preserves conflicting recorded values and warns; it does not repair them. Entirely absent cases cannot be discovered without a recorded plan.
+
+`pass`, `fail`, `review_required`, `not_applicable`, and missing/unknown states remain distinct. Legacy evaluation passes are labeled **regression/keyword-floor grades, not factual acceptance**. First-call validity does not establish correctness. Missing/null/unknown usage, cost, retries, repairs, and selection recall remain unknown; explicit zero stays zero. A legacy `falseNegativesFromSelection: 0` remains a recorded historical field, not measured recall. Regrades do not contain every original route or usage field; absent information stays absent rather than being fetched from the source report.
+
+Output is deterministic and problem-first, preserving original indices, repetitions, workflow route modes, available stage routes, criteria/layers, expected/actual, reasons, evidence spans, and provenance. Recorded evidence spans use UTF-16 offsets; the renderer does not verify their quotes against source outputs. Passing details follow failures, pending review, and unknown states. Pre-existing fixture preview truncation flags remain visible.
+
+Display limits are fixed: 32 MiB input; 64 KiB total UTF-8 output; detail for 20 attempts/results, 10 criteria per attempt, 2 evidence spans per criterion, 10 workflow stages, and 20 entries per provenance hash map. Individual previews stop at 512 Unicode code points of escaped display text, 8 nested container levels, or 32 members per container. Output marks truncation and omitted detail; previews are not necessarily valid JSON. Original artifacts and hashes are never modified. Terminal controls and bidirectional formatting controls are escaped; there is no Markdown mode. **Previews can contain private data. Truncation and escaping are not redaction: sanitize before sharing.**
+
+Omit `--output` for stdout. Explicit output uses exclusive creation and refuses existing files, including the input. Successful rendering produces no diagnostics on stderr when invoking the script directly (`bun scripts/release/report.ts ...`); `bun run` may print its own script banner there.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Report rendered (or help displayed), **not** evaluation accepted; includes failed, pending-review, and incomplete reports |
+| 2 | Invalid usage, malformed/unsupported input, or input limit exceeded |
+| 1 | Input/output I/O failure, including refusal to overwrite an existing output |
+
+For example, a valid but unfinished synthetic report with no attempts renders:
+
+```text
+Completion: unknown / possibly partial
+Recorded acceptance: unknown
+Acceptance evidence: not established or inconsistent; see warnings
+```
+
 ## Offline factual regrade
 
-No provider, executable build, credentials, or inference is needed:
+Use the same repository checkout, Bun 1.4.0, and installed dependencies as the renderer. No provider, executable build, credentials, or inference is needed:
 
 ```sh
 bun run eval:regrade -- evals/results/workflows/2026-10-03T17-34-01-189Z/report.json --output workflow-regrade.json

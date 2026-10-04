@@ -57,6 +57,14 @@ Each value descriptor contains `type`, a display `preview` limited to 256 UTF-16
 
 Diagnostics never add raw exceptions, stack traces, malformed fixture text, or partial/unvalidated results. Existing error redaction remains in force. **Value previews can contain private fixture/output data: truncation is not secret detection. Sanitize reports before sharing them.**
 
+To read an already saved `extensions test --json` report without loading or executing its extension, use a repository checkout with Bun 1.4.0 and dependencies installed (`bun install --frozen-lockfile --ignore-scripts`):
+
+```sh
+bun run eval:report -- saved-fixture-report.json
+```
+
+This is a checkout script, not an installed `ribbit` subcommand. It preserves diagnostic previews and truncation flags, defaults to stdout, and accepts `--output NEW.txt` only for a new file. Rendering exit zero means the report was displayed, not that fixtures passed. Unversioned pretty-printed fixture reports are unsupported; save the `--json` form. See [offline report usage and bounds](../evals/README.md#read-a-saved-report-offline).
+
 ## Installation contract
 
 Registry entries and immutable bundles live under `${XDG_DATA_HOME:-$HOME/.local/share}/ribbit/extensions`, using the user's home on Windows. Source changes require explicit check, test, and add operations. Removing an installed extension preserves source. Execution checks built artifacts against their recorded hashes.
