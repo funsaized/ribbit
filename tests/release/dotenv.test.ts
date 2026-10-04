@@ -6,6 +6,21 @@ import { sandbox } from '../../scripts/release/harness.ts';
 for (const mode of ['source', 'compiled'] as const)
   test(`${mode} inspection loads dotenv before resolving global definitions, except for help`, async () => {
     const env = await sandbox();
+    const requests: string[] = [];
+    const server = Bun.serve({
+      hostname: '127.0.0.1',
+      port: 0,
+      fetch(request) {
+        const path = new URL(request.url).pathname;
+
+        // Ignore host-side port probes, but count every request from Bun, including /.
+        if (path === '/' && request.headers.get('user-agent') === 'Go-http-client/1.1')
+          return new Response(null, { status: 404 });
+        requests.push(request.method + ' ' + path);
+
+        return Response.json({ data: [{ id: 'synthetic' }] });
+      },
+    });
     const entry = resolve('src/cli/main.ts');
     const binary = join(env.dir, process.platform === 'win32' ? 'no-env.exe' : 'no-env');
     const childEnv: NodeJS.ProcessEnv = { ...env.env };
@@ -92,8 +107,55 @@ for (const mode of ['source', 'compiled'] as const)
           expect(JSON.parse(doctor.out)).toMatchObject({ invocation: { args: { count } }, ok: true });
         }
       }
+      await writeFile(
+        join(realHome, 'ribbit/config.yaml'),
+        JSON.stringify({
+          providers: {
+            synthetic: {
+              type: 'openai-compatible',
+              baseUrl: `http://127.0.0.1:${server.port}/v1`,
+              defaultModel: 'synthetic',
+              capabilities: ['text'],
+            },
+          },
+          default: { provider: 'synthetic' },
+        }),
+      );
+      expect((await run(['doctor', '--json', '--probe', '--', 'ask', 'Synthetic question'], realHome)).code).toBe(0);
+      expect(requests).toEqual(['GET /v1/models']);
+      requests.length = 0;
       await rm(join(env.dir, '.env'));
       await mkdir(join(env.dir, '.env'));
+      for (const probe of ['--probe=false', '--probe']) {
+        for (const target of [[], ['take', '1'], ['ask', 'Synthetic question'], ['run', 'chosen']]) {
+          const result = await run(['doctor', '--json', probe, ...(target.length ? ['--', ...target] : [])], realHome);
+
+          expect(result.code).toBe(3);
+          expect(result.err).toBe('');
+          expect(JSON.parse(result.out)).toMatchObject({
+            schemaVersion: 1,
+            scope: target.length ? 'invocation' : 'installation',
+            ok: false,
+            status: 'unavailable',
+            verification: 'offline',
+            probeRequested: probe === '--probe',
+            checks: expect.arrayContaining([
+              expect.objectContaining({
+                name: 'configuration',
+                ok: false,
+                status: 'invalid',
+                message: expect.stringContaining('Invalid .env file'),
+              }),
+              expect.objectContaining({
+                name: 'provider-probes',
+                ok: null,
+                status: probe === '--probe' ? 'blocked' : 'not-requested',
+              }),
+            ]),
+          });
+          expect(requests).toEqual([]);
+        }
+      }
       for (const args of [
         ['take', '--help'],
         ['route', 'inspect', '--', 'take', '--help'],
@@ -105,6 +167,7 @@ for (const mode of ['source', 'compiled'] as const)
         expect(help.out).toContain('Type: @ribbit/take');
       }
     } finally {
+      server.stop(true);
       await env.close();
     }
   }, 30000);

@@ -7,7 +7,7 @@ import { listInstalled, sourceDigest } from '../../extensions/install/index.ts';
 import { checkPicker } from '../../picker/index.ts';
 import { OllamaAdapter } from '../../providers/ollama/index.ts';
 import { CompatibleAdapter } from '../../providers/openai-compatible/index.ts';
-import type { PreparedInvocation } from '../invocation.ts';
+import { prepareInvocation, type PreparedInvocation } from '../invocation.ts';
 
 function describe(prepared: PreparedInvocation) {
   return {
@@ -37,22 +37,31 @@ function diagnostic(error: unknown) {
   return error instanceof RibbitError ? error.message : 'Check failed (details redacted)';
 }
 
-export async function doctor(prepared: PreparedInvocation | undefined, probe: boolean) {
+export async function doctor(target: string[] | undefined, probe: boolean) {
   const checks: Check[] = [];
+  let prepared: PreparedInvocation | undefined;
   let config: Config | undefined;
   let route: Route | undefined;
   let project: Inference = {};
 
   try {
-    loadDotenv();
+    if (target) {
+      const invocation = await prepareInvocation(target);
+
+      if ('help' in invocation) return { help: invocation.help };
+      prepared = invocation;
+    }
+    if (!target) loadDotenv();
     config = await loadConfig();
     project = await loadProjectInference(join(process.cwd(), '.ribbit.yaml'));
     checks.push({ name: 'configuration', ok: true, status: 'valid' });
   } catch (error) {
+    // Invalid invocation syntax remains a CLI error, not a readiness check.
+    if (error instanceof RibbitError && error.code === 2) throw error;
     checks.push({ name: 'configuration', ok: false, status: 'invalid', message: diagnostic(error) });
     config = undefined;
   }
-  if (!prepared)
+  if (!target)
     checks.push({
       name: 'exact-commands',
       ok: !!config,
@@ -128,7 +137,7 @@ export async function doctor(prepared: PreparedInvocation | undefined, probe: bo
     for (const name of ['model', 'capabilities', 'authentication'])
       checks.push({ name, ok: null, status: semantic ? 'blocked' : 'not-applicable' });
   }
-  if (!prepared || prepared.invocation.manifest.type === '@ribbit/pick') {
+  if (!target || prepared?.invocation.manifest.type === '@ribbit/pick') {
     const picker = await checkPicker();
 
     checks.push({
@@ -137,9 +146,9 @@ export async function doctor(prepared: PreparedInvocation | undefined, probe: bo
       ...picker,
       message: `Requires fzf >=${picker.minimum} and a controlling terminal when running pick. No tools are installed by doctor.`,
     });
-  } else checks.push({ name: 'picker', ok: null, status: 'not-applicable' });
+  } else checks.push({ name: 'picker', ok: null, status: prepared ? 'not-applicable' : 'blocked' });
 
-  if (!prepared || !prepared.invocation.manifest.type.startsWith('@ribbit/')) {
+  if (!target || (prepared && !prepared.invocation.manifest.type.startsWith('@ribbit/'))) {
     try {
       const extensions = (await listInstalled()).filter(
         (extension) => !prepared || extension.manifest.type === prepared.invocation.manifest.type,
@@ -168,7 +177,7 @@ export async function doctor(prepared: PreparedInvocation | undefined, probe: bo
     }
   }
   if (probe && config) {
-    const providers = prepared
+    const providers = target
       ? route
         ? ([[route.provider, route.endpoint]] as const)
         : []
@@ -204,12 +213,12 @@ export async function doctor(prepared: PreparedInvocation | undefined, probe: bo
 
   return {
     schemaVersion: 1,
-    scope: prepared ? 'invocation' : 'installation',
+    scope: target ? 'invocation' : 'installation',
     invocation: prepared ? describe(prepared) : null,
     probeRequested: probe,
     verification: checks.some((check) => check.name.startsWith('probe:')) ? 'offline-and-model-list' : 'offline',
     checks,
     ok,
-    status: ok ? 'ready' : !prepared && config ? 'partial' : 'unavailable',
+    status: ok ? 'ready' : !target && config ? 'partial' : 'unavailable',
   };
 }

@@ -103,7 +103,7 @@ export async function admin(command: string, tokens: string[]): Promise<void> {
         2,
         `Use ${command === 'route' ? 'route inspect' : 'doctor'} [options] -- COMMAND [arguments]`,
       );
-    const prepared = target ? await prepareInvocation(target) : undefined;
+    const prepared = command === 'route' ? await prepareInvocation(target!) : undefined;
 
     if (prepared && 'help' in prepared) {
       console.log(prepared.help);
@@ -112,8 +112,13 @@ export async function admin(command: string, tokens: string[]): Promise<void> {
     }
     if (command === 'route') result(await inspectInvocation(prepared!));
     else {
-      const report = await doctor(prepared, f.probe === true);
+      const report = await doctor(target, f.probe === true);
 
+      if ('help' in report) {
+        console.log(report.help);
+
+        return;
+      }
       result(report);
       if (!report.ok) process.exitCode = 3;
     }
