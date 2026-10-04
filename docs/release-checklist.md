@@ -1,4 +1,8 @@
-# First open-source release checklist
+# Release checklist
+
+The latest published preview is [**0.1.0-alpha.2**](https://github.com/funsaized/ribbit/releases/tag/v0.1.0-alpha.2). The acceptance evidence below describes the source checkout, including [unreleased changes](../CHANGELOG.md#unreleased), not certification that those changes shipped in the npm alpha or published native archives. A new candidate needs verification at its own exact revision before publication.
+
+## First-release decision (historical)
 
 Version **0.1.0-alpha.1** is an MIT-licensed experimental preview, authorized for public release on 2026-09-20 with all 22 commands and the Ribbit name. Independent semantic review and a new-user pilot are follow-up work. Each advertised archive must pass native verification before publication.
 
@@ -31,7 +35,7 @@ The [current-state baseline](../evals/README.md) separates deterministic passes,
 
 The original 22-command scope is retained; `where` adds a 23rd exact selector with separate packaged flow coverage. Exact modes can be presented with their tested deterministic contracts. Semantic commands should remain experimental and tied to measured profiles. Version `0.1.0-alpha.1` is an experimental preview; no 1.0 promise is introduced.
 
-## Resolved release decisions and follow-up work
+## Resolved first-release decisions and follow-up work
 
 - MIT license, attributed to Sai Nimmagadda using the existing repository author identity.
 - Public experimental preview authorized; publish on the configured `funsaized/ribbit` GitHub remote.
