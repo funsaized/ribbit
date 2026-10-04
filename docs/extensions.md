@@ -34,6 +34,7 @@ Results retain `file`, `pass`, and any existing `error`, `location`, and `messag
 | `error-mismatch` | An expected error did not occur or its code differed | `expected` and `actual` outcomes: `{outcome:"error",code:2}` or `{outcome:"return"}`; code is omitted if unavailable |
 | `execution-failure` | Unexpected execution or schema-validation failure | Existing `error`, `location`, and safe `message` describe the failure |
 | `fixture-json` | Fixture could not be read or parsed as JSON | Existing error 2, filename location, and `Invalid fixture JSON` message |
+| `diagnostic-unavailable` | Comparison or diagnostic generation threw | No exception details; fixture remains failed and later fixtures still run |
 
 For example, changing the scaffold's expected value to `"WRONG"` produces this failed result (synthetic example):
 
@@ -50,7 +51,7 @@ For example, changing the scaffold's expected value to `"WRONG"` produces this f
 }
 ```
 
-Value diagnostics explain the first mismatch; they do not change deep strict equality or error-code matching. Object keys are compared in sorted order and array indices in numeric order. `path` is a JSON Pointer relative to the expected/actual result: `""` means the root, `/items/2/name` selects a nested value, and `~` and `/` in keys are escaped as `~0` and `~1`. A missing or extra key/element uses that key/index's path. Traversal stops at 32 segments or before exceeding 512 UTF-16 code units, reports the ancestor values, and sets `pathTruncated: true`.
+Value diagnostics explain the first mismatch; they do not change deep strict equality or error-code matching. Comparison and diagnostics run outside execution-error matching: throwing getters or serialization hooks cannot turn a failed comparison into an expected-error pass. If comparison itself throws, the fixture fails rather than claiming equality. Object keys are compared in sorted order and array indices in numeric order. `path` is a JSON Pointer relative to the expected/actual result: `""` means the root, `/items/2/name` selects a nested value, and `~` and `/` in keys are escaped as `~0` and `~1`. A missing or extra key/element uses that key/index's path. Traversal stops at 32 segments or before exceeding 512 UTF-16 code units, reports the ancestor values, and sets `pathTruncated: true`.
 
 Each value descriptor contains `type`, a display `preview` limited to 256 UTF-16 code units, and `truncated`. `missing` is distinct from `null` and from strings such as `"missing"`. Previews use JSON notation (with `-0` preserved for scalar comparisons), sorted object keys, or `<missing>`. A truncated preview is not necessarily valid JSON. If serialization fails, the preview is `<preview unavailable>` with `truncated: true`. These are display bounds, not new execution or memory budgets.
 

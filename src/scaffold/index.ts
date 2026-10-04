@@ -66,12 +66,12 @@ function preview(value: unknown) {
                   )
                 : child,
             );
+
+    return { type, preview: text.slice(0, 256), truncated: text.length > 256 };
   } catch {
-    // A diagnostic must not turn an otherwise ordinary mismatch into an execution failure.
+    // Serialization hooks can throw or return undefined instead of JSON text.
     return { type, preview: '<preview unavailable>', truncated: true };
   }
-
-  return { type, preview: text.slice(0, 256), truncated: text.length > 256 };
 }
 
 function valueMismatch(expected: unknown, actual: unknown) {
@@ -130,7 +130,7 @@ type FixtureResult = {
   diagnostic?:
     | ReturnType<typeof valueMismatch>
     | { kind: 'error-mismatch'; expected: Outcome; actual: Outcome }
-    | { kind: 'execution-failure' | 'fixture-json' };
+    | { kind: 'execution-failure' | 'fixture-json' | 'diagnostic-unavailable' };
 };
 
 function errorOutcome(code: unknown): Outcome {
@@ -184,6 +184,7 @@ export async function testExtension(path: string) {
           },
         },
       };
+      let actual: unknown;
 
       try {
         let input = fixture.input;
@@ -192,34 +193,10 @@ export async function testExtension(path: string) {
           input = (async function* () {
             yield* fixture.input;
           })();
-        let actual = await dispatch(
-          command,
-          fixture.action ?? 'run',
-          input,
-          fixture.args ?? {},
-          fixture.config ?? {},
-          ctx,
-        );
+        actual = await dispatch(command, fixture.action ?? 'run', input, fixture.args ?? {}, fixture.config ?? {}, ctx);
 
         if (actual && typeof (actual as AsyncIterable<unknown>)[Symbol.asyncIterator] === 'function')
           actual = await Array.fromAsync(actual as AsyncIterable<unknown>);
-        const pass = !fixture.error && isDeepStrictEqual(actual, fixture.expected);
-
-        results.push({
-          file,
-          pass,
-          ...(!pass
-            ? {
-                diagnostic: fixture.error
-                  ? {
-                      kind: 'error-mismatch' as const,
-                      expected: errorOutcome(fixture.error),
-                      actual: { outcome: 'return' as const },
-                    }
-                  : valueMismatch(fixture.expected, actual),
-              }
-            : {}),
-        });
       } catch (e) {
         const error = e as { code?: number; location?: string };
         const pass = fixture.error === error.code;
@@ -242,9 +219,24 @@ export async function testExtension(path: string) {
               }
             : {}),
         });
+        continue;
       } finally {
         budget.close();
       }
+
+      // Comparison and diagnostics must never be matched as expected execution errors.
+      const result: FixtureResult = { file, pass: false };
+
+      try {
+        result.pass = !fixture.error && isDeepStrictEqual(actual, fixture.expected);
+        if (!result.pass)
+          result.diagnostic = fixture.error
+            ? { kind: 'error-mismatch', expected: errorOutcome(fixture.error), actual: { outcome: 'return' } }
+            : valueMismatch(fixture.expected, actual);
+      } catch {
+        result.diagnostic = { kind: 'diagnostic-unavailable' };
+      }
+      results.push(result);
     }
 
     return { passed: results.filter((r) => r.pass).length, failed: results.filter((r) => !r.pass).length, results };

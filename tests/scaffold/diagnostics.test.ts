@@ -8,13 +8,29 @@ import { cleanEnvironment } from '../../scripts/platform.ts';
 // Synthetic trusted extension: all inference uses fixture responses, never a provider.
 const source = `import {defineCommand,defineAction,z,jsonValueSchema} from '@ribbit/sdk';
 const config=z.strictObject({enabled:z.boolean().default(true)});
-const args=z.strictObject({behavior:z.enum(['echo','throw','text','object']).default('echo')});
+const args=z.strictObject({behavior:z.enum(['echo','throw','text','object','tojson-undefined','tojson-throw','getter','getter-null','getter-undefined']).default('echo')});
 const base={config,args,description:'Synthetic fixture diagnostics',capabilities:[],effects:[]};
 export default defineCommand({type:'@test/diagnostics',version:'1.0.0',description:'Synthetic',config,actions:{
   run:defineAction({...base,input:jsonValueSchema,output:jsonValueSchema,mode:'value',execute:async({input,args},ctx)=>{
     if(args.behavior==='throw') throw new Error('SYNTHETIC_PRIVATE_EXCEPTION');
     if(args.behavior==='text') return (await ctx.llm.text('synthetic',''))+(await ctx.llm.text('synthetic',''));
     if(args.behavior==='object') return ctx.llm.object('synthetic','',z.strictObject({answer:z.string()}));
+    if(args.behavior.startsWith('tojson')) return Object.defineProperty({a:1},'toJSON',{value(){
+      if(args.behavior==='tojson-throw') throw new Error('SYNTHETIC_PRIVATE_SERIALIZER');
+      return undefined;
+    }});
+    if(args.behavior.startsWith('getter')) {
+      let reads=0;
+      return Object.defineProperty({},'a',{enumerable:true,get(){
+        // Validation reads twice; the subsequent comparison/diagnostic must not alter the verdict.
+        if(++reads>2) {
+          if(args.behavior==='getter-null') throw null;
+          if(args.behavior==='getter-undefined') throw undefined;
+          throw new Error('SYNTHETIC_PRIVATE_GETTER');
+        }
+        return 1;
+      }});
+    }
     return input;
   }}),
   string:defineAction({...base,input:z.string(),output:z.string(),mode:'value',execute:({input})=>input}),
@@ -35,6 +51,7 @@ const mismatch = (path: string, expected: ReturnType<typeof preview>, actual: Re
   actual,
 });
 
+// Five sequential extension builds/replays need headroom on macOS Intel; keep every parity assertion.
 test('fixture diagnostics preserve verdicts and explain bounded deterministic mismatches without providers', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'ribbit-diagnostics-'));
   const requests: string[] = [];
@@ -237,6 +254,33 @@ test('fixture diagnostics preserve verdicts and explain bounded deterministic mi
       { input: null, args: { behavior: 'object' }, responses: [{ answer: 42 }] },
       { pass: false, error: 5, diagnostic: { kind: 'execution-failure' } },
     );
+    for (const behavior of ['tojson-undefined', 'tojson-throw'])
+      add(
+        `hook-${behavior}`,
+        { input: null, args: { behavior }, expected: null },
+        {
+          pass: false,
+          diagnostic: mismatch('', preview('null', 'null'), preview('object', '<preview unavailable>', true)),
+        },
+      );
+    for (const behavior of ['getter', 'getter-null', 'getter-undefined'])
+      add(
+        `hook-${behavior}`,
+        { input: null, args: { behavior }, expected: {} },
+        {
+          pass: false,
+          diagnostic: { kind: 'diagnostic-unavailable' },
+        },
+      );
+    add(
+      'hook-comparison',
+      { input: null, args: { behavior: 'getter' }, expected: { a: 2 } },
+      {
+        pass: false,
+        diagnostic: { kind: 'diagnostic-unavailable' },
+      },
+    );
+    add('zz-after-hooks', { input: 'still runs', expected: 'still runs' }, { pass: true });
     // Keep negative zero intact: JSON.stringify would erase this equality distinction.
     await writeFile(join(dir, 'fixtures/negative-zero.json'), '{"input":0,"expected":-0}');
     await writeFile(join(dir, 'fixtures/malformed.json'), '{SYNTHETIC_PRIVATE_MALFORMED');
@@ -249,6 +293,7 @@ test('fixture diagnostics preserve verdicts and explain bounded deterministic mi
 
       expect(row, name).toMatchObject(result);
       if ('pass' in result && result.pass) expect(row).not.toHaveProperty('diagnostic');
+      if (name.startsWith('hook-')) expect(row).not.toHaveProperty('error');
     }
     expect(report.results.find((r) => r.file === 'negative-zero.json')?.diagnostic).toEqual(
       mismatch('', preview('number', '-0'), preview('number', '0')),
@@ -261,7 +306,7 @@ test('fixture diagnostics preserve verdicts and explain bounded deterministic mi
       message: 'Invalid fixture JSON',
       diagnostic: { kind: 'fixture-json' },
     });
-    expect(report.passed).toBe(7);
+    expect(report.passed).toBe(8);
     expect(report.failed).toBe(cases.length + 2 - report.passed);
     expect(report.results.map((r) => r.file)).toEqual(report.results.map((r) => r.file).toSorted());
     const serialized = JSON.stringify(report);
@@ -310,4 +355,4 @@ test('fixture diagnostics preserve verdicts and explain bounded deterministic mi
     server.stop(true);
     await rm(dir, { recursive: true, force: true });
   }
-}, 30000);
+}, 120000);
