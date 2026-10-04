@@ -8,7 +8,10 @@ test('packaged management lifecycle and discovery', async () => {
   const provider = mockProvider(),
     env = await sandbox(provider.config);
   const invoke = async (args: string[]) => {
-    const result = await env.run([...args, '--json']);
+    const separator = args.indexOf('--');
+    const result = await env.run(
+      separator < 0 ? [...args, '--json'] : [...args.slice(0, separator), '--json', ...args.slice(separator)],
+    );
 
     expect(result.code, result.err).toBe(0);
     const value = JSON.parse(result.out);
@@ -26,10 +29,14 @@ test('packaged management lifecycle and discovery', async () => {
     }
     expect((await invoke(['types', 'list'])).types.length).toBe(23);
     expect((await invoke(['types', 'describe', '@ribbit/filter'])).type.type).toBe('@ribbit/filter');
-    expect((await invoke(['route', 'inspect', 'ask', '--profile', 'stronger'])).model).toBe('strong');
-    expect((await invoke(['route', 'inspect', 'take'])).inference).toBe(false);
+    expect(
+      (await invoke(['route', 'inspect', '--', 'ask', 'Synthetic question', '--profile', 'stronger'])).route.model,
+    ).toBe('strong');
+    expect((await invoke(['route', 'inspect', '--', 'take', '1'])).inference.status).toBe('exact');
     expect((await invoke(['models', 'list', '--provider', 'mock'])).models).toEqual(['small', 'strong']);
-    expect((await invoke(['doctor', '--probe'])).checks.every((c: any) => c.ok)).toBe(true);
+    expect((await invoke(['doctor', '--probe'])).checks.every((c: { ok: boolean | null }) => c.ok !== false)).toBe(
+      true,
+    );
     expect((await invoke(['setup'])).downloadPerformed).toBe(false);
     await invoke([
       'providers',

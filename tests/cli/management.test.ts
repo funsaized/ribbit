@@ -53,7 +53,7 @@ test('failed configuration update preserves prior bytes and route inspection hid
 
     expect(invalid.code).not.toBe(0);
     expect(await readFile(path, 'utf8')).toBe(before);
-    const inspect = await run(['route', 'inspect', 'ask', '--provider', 'local', '--json']);
+    const inspect = await run(['route', 'inspect', '--json', '--', 'ask', 'Synthetic question', '--provider', 'local']);
 
     expect(inspect.code).toBe(0);
     expect(inspect.out + inspect.err).not.toContain('NEVER-PRINT-THIS');

@@ -33,9 +33,9 @@ export const MANAGEMENT: Record<string, Record<string, ManagementOperation>> = {
   },
   route: {
     inspect: {
-      usage: 'inspect COMMAND',
-      flags: ['profile', 'provider', 'model'],
-      note: 'Inspects declared/default arguments without inference. Does not accept action argument flags.',
+      usage: 'inspect [options] -- COMMAND [arguments] [runtime flags]',
+      flags: [],
+      note: 'Parses a concrete invocation using execution defaults and overrides, without reading input or contacting providers. Put --json before -- and target --profile/--provider/--model after it. COMMAND may be run NAME. Exact invocations need no inference route. Use flow plan for unresolved flow references.',
     },
   },
   commands: {
@@ -76,9 +76,9 @@ export const MANAGEMENT: Record<string, Record<string, ManagementOperation>> = {
   },
   doctor: {
     '': {
-      usage: '[--probe[=true|false]]',
+      usage: '[options] [-- COMMAND [arguments] [runtime flags]]',
       flags: ['probe'],
-      note: 'Checks configuration, picker and extension freshness. Only --probe contacts configured providers.',
+      note: 'Checks configuration, route completeness, declared capabilities, authentication readiness, fzf >=0.74.3 and extension freshness. Optional -- COMMAND scopes readiness to that invocation. Exit 0 means applicable checks passed, not proven model quality; exit 3 means partial/unavailable readiness. Only --probe or --probe=true lists models (selected provider when scoped, all configured providers otherwise); --probe=false stays offline. No inference, downloads or configuration changes.',
     },
   },
 };

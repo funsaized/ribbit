@@ -6,11 +6,11 @@ Start with the failing command's exit code and stderr. Keep stdout separate so d
 
 ```sh
 ribbit doctor --json
-ribbit route inspect ask --profile local-small --json
-ribbit doctor --probe --json
+ribbit route inspect --json -- ask 'Who owns the fix?' --profile local-small
+ribbit doctor --json --probe -- ask 'Who owns the fix?' --profile local-small
 ```
 
-`--probe` makes explicit provider requests. Confirm the endpoint and exact model identifier before retrying a semantic task. For a local endpoint, check that its server is running and the model is available there.
+Doctor reports partial readiness with exit 3: exact non-picker commands may still work without a default route or fzf. Scope it with `-- COMMAND [args]` to check the failing invocation. Ordinary inspection and `--probe=false` are offline. `--probe` explicitly lists the selected provider's models; it does not test inference or model-specific capability support. Confirm the endpoint and exact model identifier before retrying a semantic task. For a local endpoint, check that its server is running and the model is available there.
 
 ## Capture diagnostics without mixing them into data
 

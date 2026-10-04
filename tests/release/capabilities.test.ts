@@ -109,12 +109,12 @@ test('packaged map modes, saved defaults and flow bindings use the same capabili
       expect(requests).toEqual([]);
     }
     requests.length = 0;
-    const inspect = await env.run(['route', 'inspect', 'owner', '--json']);
+    const inspect = await env.run(['route', 'inspect', '--json', '--', 'owner']);
 
     expect(inspect.code, inspect.err).toBe(0);
     expect(JSON.parse(inspect.out)).toMatchObject({
-      provider: 'object',
-      requirements: { status: 'semantic', capabilities: ['object'] },
+      route: { provider: 'object' },
+      inference: { status: 'semantic', capabilities: ['object'] },
     });
     const planned = await env.run(['flow', 'plan', '--', 'owner']);
 

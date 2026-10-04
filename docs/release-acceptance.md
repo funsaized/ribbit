@@ -34,16 +34,16 @@ Raw evidence: [Gemma](../evals/results/release/2026-10-03T17-30-00-842Z-ribbit-b
 
 ## Management surfaces
 
-Evidence: [packaged lifecycle tests](../tests/release/management.test.ts), [recipe tests](../tests/release/recipes.test.ts), and existing CLI/extension tests.
+Evidence: [packaged lifecycle tests](../tests/release/management.test.ts), [concrete inspection tests](../tests/release/inspection.test.ts), [picker readiness tests](../tests/release/doctor-picker.test.ts), [recipe tests](../tests/release/recipes.test.ts), and existing CLI/extension tests.
 
 | Surface | Checked behavior | Verdict |
 | --- | --- | --- |
 | setup | Discovery returns versioned data, performs no download or config mutation | PASS in packaged tests |
-| doctor | Configuration, picker presence, installed extension health, explicit model probe | PASS in packaged tests |
+| doctor | Scoped/default route readiness, declared capabilities, authentication, fzf version, extension health, explicit model-list probes | PASS in packaged tests |
 | providers | Add/list/remove and referenced-provider rejection | PASS in packaged tests |
 | models | Explicit provider discovery against mock HTTP | PASS in packaged tests |
 | profiles | Set/show/list/remove and route selection | PASS in packaged tests |
-| route | Semantic model provenance and exact no-inference inspection | PASS in packaged tests |
+| route | Concrete parsed arguments/defaults/overrides, execution-matched route provenance and exact no-inference inspection | PASS in packaged tests |
 | commands | List/describe every built-in; validate named definition | PASS in packaged tests |
 | types | List and scoped contract description | PASS in packaged tests |
 | extensions | Scaffold/check/test/add/list/remove; source preserved | PASS in packaged tests |

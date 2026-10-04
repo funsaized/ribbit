@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { type Context, Budget } from '../../sdk/index.ts';
 import { type RecordValue, RibbitError, validateRecord } from '../records/index.ts';
-import { type Manifest, type ActionManifest } from '../../sdk/manifest/index.ts';
+import { type Manifest } from '../../sdk/manifest/index.ts';
 import { loadProjectInference, type Config, type Inference } from '../../config/index.ts';
 import { resolveRoute, commandRoute, type Layer, type Route } from '../../routing/index.ts';
 import { ManagedInference } from '../inference/index.ts';
@@ -27,8 +27,16 @@ export interface Invocation {
   inference?: Inference;
 }
 
-export function requiresInference(action: ActionManifest, args: Record<string, any>) {
-  return resolveCapabilities(action, args).status !== 'exact';
+export function invocationLayers(
+  invocation: Invocation,
+  config: Config,
+  layers: Partial<Record<Layer, Inference>> = {},
+) {
+  return {
+    perCommand: commandRoute(config, invocation.name, `${invocation.manifest.type}/${invocation.action}`),
+    definition: invocation.inference,
+    ...layers,
+  };
 }
 
 export function routeFor(
@@ -46,11 +54,7 @@ export function routeFor(
 
   return resolveRoute(
     config,
-    {
-      perCommand: commandRoute(config, invocation.name, `${invocation.manifest.type}/${invocation.action}`),
-      definition: invocation.inference,
-      ...layers,
-    },
+    invocationLayers(invocation, config, layers),
     force,
     requirements.capabilities,
     `${invocation.name}/${invocation.action}`,

@@ -30,7 +30,7 @@ Capabilities must match the endpoint; Ribbit does not infer support from the mod
 
 Command requirements depend on the selected arguments: `map` requires only `text` without a nonempty `schema`, and only `object` with one. Annotation mode does not change this. `find --about`, `tree --about` or `--describe`, and `pick --about` require `object`; their exact modes require no inference route. Requirements describe the mode, not a minimum request count: an empty semantic stream can finish without acquiring a route.
 
-Manifests and help expose these declarative requirements. `route inspect` reports `requirements` for the saved/default arguments it currently accepts; it does not yet accept concrete action argument flags. Use `flow plan -- COMMAND [args]` to inspect a concrete invocation offline.
+Manifests and help expose these declarative requirements. `route inspect --json -- COMMAND [args]` reports the concrete invocation's parsed arguments, defaults, limits, `inference` requirements and resolved `route`. It stays offline and does not read task files. Use `flow plan` for unresolved flow references; see [inspection and readiness](management.md) for report and exit-status semantics.
 
 ## Inference fields
 
@@ -60,7 +60,7 @@ Routes merge from weaker to stronger layers:
 
 `--force-profile` replaces managed routes across a flow after these layers. It applies only to flows. A provider override selects that provider's default model unless the layer also supplies a model; it does not silently retain another provider's model.
 
-Inspect a route with `ribbit route inspect COMMAND --profile NAME --json`. No automatic fallback occurs when a route fails.
+Inspect a route with `ribbit route inspect --json -- COMMAND [args] --profile NAME`. No automatic fallback occurs when a route fails.
 
 ## Reasoning controls
 

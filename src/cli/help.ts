@@ -103,7 +103,12 @@ export function managementHelp(command: string, operation?: string): string {
   if (operation && !operations[operation]) throw new RibbitError(2, `Unknown ${command} operation; use --help`);
   const entries = Object.values(selected);
   const flags = [...new Set(entries.flatMap((op) => op.flags))];
-  const usage = entries.map((op) => `  ribbit ${command}${op.usage ? ' ' + op.usage : ''} [options]`).join('\n');
+  const usage = entries
+    .map(
+      (op) =>
+        `  ribbit ${command}${op.usage ? ' ' + op.usage : ''}${op.usage.includes('[options]') ? '' : ' [options]'}`,
+    )
+    .join('\n');
   const notes = entries.flatMap((op) => (op.note ? [op.note] : []));
 
   return `Usage:\n${usage}\n\nOptions:\n${flags.map((flag) => `  --${flag}${managementBooleans.has(flag) ? '[=true|false]' : ` <${MANAGEMENT_FLAGS[flag]}>`}`).join('\n')}\n  --json[=true|false] (default: false)\n  --error-format <text|json> (default: text)\n  --help\n\n${notes.join('\n')}\n`;

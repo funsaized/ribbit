@@ -17,7 +17,12 @@ JSONL
 Check the route before sending evidence:
 
 ```sh
-ribbit route inspect classify --profile local-small --json
+ribbit route inspect --json -- classify --field body \
+  --label 'blocking=Prevents a customer from completing a purchase' \
+  --label 'cosmetic=Appearance or wording with no functional impact' \
+  --label 'unknown=Insufficient evidence to determine impact' \
+  --unknown-label unknown --profile local-small \
+  --file feedback.jsonl --input jsonl
 ```
 
 Confirm that the provider and model match the profile you configured. If Ribbit reports exit 3, return to the setup guide and complete the route before continuing.

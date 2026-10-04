@@ -64,8 +64,14 @@ test('catalog/help/completions/plan do not import installed code or invoke fetch
       ['types', 'describe', '@audit/echo', '--json'],
       ['types', 'list', '--json'],
       ['commands', 'describe', 'echo', '--json'],
-      ['route', 'inspect', 'echo', '--json'],
-      ['route', 'inspect', 'semantic-echo', '--json'],
+      ['route', 'inspect', '--json', '--', 'echo'],
+      ['route', 'inspect', '--json', '--', 'semantic-echo'],
+      ['route', 'inspect', '--json', '--', 'echo', '--semantic'],
+      ['route', 'inspect', '--', 'echo', '--help'],
+      ['doctor', '--json', '--', 'semantic-echo'],
+      ['doctor', '--json', '--', 'echo', '--semantic=false'],
+      ['doctor', '--probe', '--', 'echo', '--help'],
+      ...names.map((name) => ['route', 'inspect', '--json', '--', 'run', name]),
       ['flow', 'plan', '--', 'semantic-echo'],
       ['doctor', '--probe=false', '--json'],
       ['flow', 'plan', 'flow.yaml'],
@@ -99,6 +105,34 @@ test('catalog/help/completions/plan do not import installed code or invoke fetch
     expect(await new Response(run.stdout).text()).toBe('offline\n');
     expect(await run.exited).toBe(0);
     expect(await readFile(marker, 'utf8')).toBe(initial + 'import\n');
+    await writeFile(
+      join(source, 'index.ts'),
+      (await readFile(join(source, 'index.ts'), 'utf8')) + '\n// Stale synthetic source\n',
+    );
+    for (const [target, expectedCode] of [
+      [['semantic-echo'], 3],
+      [['take', '1'], 0],
+    ] as const) {
+      const child = Bun.spawn(
+        ['bun', '--preload', guard, resolve('src/cli/main.ts'), 'doctor', '--json', '--', ...target],
+        {
+          cwd: dir,
+          env: { ...process.env, XDG_CONFIG_HOME: join(dir, 'config'), XDG_DATA_HOME: data },
+          stdin: 'ignore',
+          stdout: 'pipe',
+          stderr: 'pipe',
+        },
+      );
+      const report = JSON.parse(await new Response(child.stdout).text());
+
+      expect(await new Response(child.stderr).text()).toBe('');
+      expect(await child.exited).toBe(expectedCode);
+      if (expectedCode === 3)
+        expect(report.checks).toContainEqual(
+          expect.objectContaining({ name: 'extension:@audit/echo', status: 'stale' }),
+        );
+      expect(await readFile(marker, 'utf8')).toBe(initial + 'import\n');
+    }
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

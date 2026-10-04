@@ -25,13 +25,7 @@ export interface Route {
   endpoint: Provider;
 }
 
-export function resolveRoute(
-  config: Config,
-  layers: Partial<Record<Layer, Inference>>,
-  forceProfile?: string,
-  capabilities: string[] = ['text'],
-  invocation = 'Invocation',
-): Route {
+export function selectRoute(config: Config, layers: Partial<Record<Layer, Inference>>, forceProfile?: string): Route {
   let route: Partial<Inference> = {},
     source: Record<string, string> = {};
 
@@ -80,8 +74,11 @@ export function resolveRoute(
   const endpoint = config.providers[route.provider];
 
   if (!endpoint) throw new RibbitError(3, 'Resolved provider is not configured');
-  if (endpoint.models && !endpoint.models.includes(route.model))
-    throw new RibbitError(3, 'Resolved model is not in provider model allowlist');
+
+  return { ...route, provider: route.provider, model: route.model, source, endpoint };
+}
+
+export function routeChecks(route: Route, capabilities: string[]) {
   const required = [
     ...capabilities,
     ...(route.temperature === undefined ? [] : ['temperature']),
@@ -89,14 +86,33 @@ export function resolveRoute(
     ...(route.reasoning === undefined ? [] : ['reasoning']),
   ];
 
-  for (const capability of required)
-    if (!endpoint.capabilities.includes(capability as Provider['capabilities'][number]))
-      throw new RibbitError(
-        3,
-        `${invocation} requires ${capability}; provider ${route.provider}, model ${route.model}, declares [${endpoint.capabilities.join(', ')}]. Select an explicitly configured compatible route or correct the provider declaration after verifying support.`,
-      );
+  return {
+    modelAllowed: !route.endpoint.models || route.endpoint.models.includes(route.model),
+    required: [...new Set(required)],
+    missing: [...new Set(required)].filter(
+      (capability) => !route.endpoint.capabilities.includes(capability as Provider['capabilities'][number]),
+    ),
+  };
+}
 
-  return { ...route, provider: route.provider, model: route.model, source, endpoint };
+export function resolveRoute(
+  config: Config,
+  layers: Partial<Record<Layer, Inference>>,
+  forceProfile?: string,
+  capabilities: string[] = ['text'],
+  invocation = 'Invocation',
+): Route {
+  const route = selectRoute(config, layers, forceProfile);
+  const checks = routeChecks(route, capabilities);
+
+  if (!checks.modelAllowed) throw new RibbitError(3, 'Resolved model is not in provider model allowlist');
+  for (const capability of checks.missing)
+    throw new RibbitError(
+      3,
+      `${invocation} requires ${capability}; provider ${route.provider}, model ${route.model}, declares [${route.endpoint.capabilities.join(', ')}]. Select an explicitly configured compatible route or correct the provider declaration after verifying support.`,
+    );
+
+  return route;
 }
 
 export function commandRoute(config: Config, name: string, typeAction?: string): Inference | undefined {
