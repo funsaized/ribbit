@@ -18,34 +18,27 @@ const pull = {
 };
 const comment = { id: 19, html_url: `${url}#issuecomment-19`, body: 'Reproduce this', user: { login: 'reviewer' } };
 
-test('cloneable lifecycle and default fixtures cannot invoke gh', async () => {
-  const dir = await mkdtemp(join(tmpdir(), 'ribbit-gh-offline-'));
+test('cloneable check and default fixtures cannot invoke gh', async () => {
+  const { dir, cloned, env } = await offlineSandbox();
+  const call = (args: string[]) => run(dir, env, args);
 
   try {
-    const cloned = join(dir, 'gh-evidence');
-
-    await cp(source, cloned, { recursive: true });
-    await mkdir(join(dir, 'bin'));
-    await mkdir(join(dir, 'commands'));
-    await writeFile(join(dir, 'bin', 'gh'), '#!/bin/sh\nprintf trap >> "$GH_LOG"\nexit 99\n', { mode: 0o755 });
-    await writeFile(
-      join(dir, 'commands', 'gh-evidence.yaml'),
-      await readFile(resolve('examples/commands/gh-evidence.yaml'), 'utf8'),
-    );
-    const env = {
-      ...process.env,
-      PATH: `${join(dir, 'bin')}:${process.env.PATH ?? ''}`,
-      GH_LOG: join(dir, 'log'),
-      XDG_CONFIG_HOME: join(dir, 'config'),
-      XDG_DATA_HOME: join(dir, 'data'),
-    };
-    const call = (args: string[]) => run(dir, env, args);
-
     expect((await call(['extensions', 'check', cloned, '--json'])).code).toBe(0);
     const fixtures = await call(['extensions', 'test', cloned, '--json']);
 
     expect(fixtures.code).toBe(0);
     expect(JSON.parse(fixtures.out)).toMatchObject({ passed: 7, failed: 0 });
+    await expect(readFile(join(dir, 'log'))).rejects.toMatchObject({ code: 'ENOENT' });
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}, 30000);
+
+test('installed lifecycle rejects invalid arguments and stale sources without invoking gh', async () => {
+  const { dir, cloned, env } = await offlineSandbox();
+  const call = (args: string[]) => run(dir, env, args);
+
+  try {
     expect((await call(['extensions', 'add', cloned, '--json'])).code).toBe(0);
     expect((await call(['gh-evidence', '--help'])).out).toContain('Action: run');
     expect((await call(['commands', 'describe', 'gh-evidence', '--json'])).out).toContain('@examples/gh-evidence');
@@ -162,6 +155,9 @@ test.skipIf(process.platform === 'win32')(
       expect(timed.code).toBe(5);
       expect(timed.err).toContain('GitHub request timed out');
       expect(Date.now() - start).toBeLessThan(7000);
+      const pid = Number(await readFile(join(dir, 'pid'), 'utf8'));
+
+      expect(() => process.kill(pid, 0)).toThrow();
       await rm(join(dir, 'bin', 'gh'));
       const missing = await run(dir, { ...env, PATH: join(dir, 'bin') }, args);
 
@@ -224,6 +220,37 @@ test.skipIf(process.platform === 'win32')(
   },
   20000,
 );
+
+async function offlineSandbox() {
+  const dir = await mkdtemp(join(tmpdir(), 'ribbit-gh-offline-'));
+  const cloned = join(dir, 'gh-evidence');
+
+  try {
+    await cp(source, cloned, { recursive: true });
+    await mkdir(join(dir, 'bin'));
+    await mkdir(join(dir, 'commands'));
+    await writeFile(join(dir, 'bin', 'gh'), '#!/bin/sh\nprintf trap >> "$GH_LOG"\nexit 99\n', { mode: 0o755 });
+    await writeFile(
+      join(dir, 'commands', 'gh-evidence.yaml'),
+      await readFile(resolve('examples/commands/gh-evidence.yaml'), 'utf8'),
+    );
+
+    return {
+      dir,
+      cloned,
+      env: {
+        ...process.env,
+        PATH: `${join(dir, 'bin')}:${process.env.PATH ?? ''}`,
+        GH_LOG: join(dir, 'log'),
+        XDG_CONFIG_HOME: join(dir, 'config'),
+        XDG_DATA_HOME: join(dir, 'data'),
+      },
+    };
+  } catch (error) {
+    await rm(dir, { recursive: true, force: true });
+    throw error;
+  }
+}
 
 async function run(cwd: string, env: Record<string, string | undefined>, args: string[]) {
   const p = Bun.spawn([process.execPath, cli, ...args], { cwd, env, stdin: 'ignore', stdout: 'pipe', stderr: 'pipe' });

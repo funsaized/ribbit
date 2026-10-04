@@ -4,22 +4,9 @@ import { join } from 'node:path';
 import { sandbox, mockProvider } from '../../scripts/release/harness.ts';
 import { ADMIN } from '../../src/cli/admin/contract.ts';
 
-test('packaged management lifecycle and discovery', async () => {
-  const provider = mockProvider(),
-    env = await sandbox(provider.config);
-  const invoke = async (args: string[]) => {
-    const separator = args.indexOf('--');
-    const result = await env.run(
-      separator < 0 ? [...args, '--json'] : [...args.slice(0, separator), '--json', ...args.slice(separator)],
-    );
-
-    expect(result.code, result.err).toBe(0);
-    const value = JSON.parse(result.out);
-
-    expect(value.schemaVersion).toBe(1);
-
-    return value;
-  };
+test('packaged catalog inspection exposes every built-in contract', async () => {
+  const env = await managementSandbox();
+  const { invoke } = env;
 
   try {
     expect((await invoke(['commands', 'list'])).commands.length).toBe(23);
@@ -29,6 +16,16 @@ test('packaged management lifecycle and discovery', async () => {
     }
     expect((await invoke(['types', 'list'])).types.length).toBe(23);
     expect((await invoke(['types', 'describe', '@ribbit/filter'])).type.type).toBe('@ribbit/filter');
+  } finally {
+    await env.close();
+  }
+}, 30000);
+
+test('packaged provider/profile lifecycle, route readiness and guidance', async () => {
+  const env = await managementSandbox();
+  const { invoke, provider } = env;
+
+  try {
     expect(
       (await invoke(['route', 'inspect', '--', 'ask', 'Synthetic question', '--profile', 'stronger'])).route.model,
     ).toBe('strong');
@@ -61,6 +58,16 @@ test('packaged management lifecycle and discovery', async () => {
     await invoke(['init', '--agent', 'codex']);
     expect(await readFile(join(env.dir, 'AGENTS.md'), 'utf8')).toBe(guidance);
     expect(guidance).toContain('Existing owner guidance.');
+  } finally {
+    await env.close();
+  }
+}, 30000);
+
+test('packaged named commands retain defaults and reserved-name behavior', async () => {
+  const env = await managementSandbox();
+  const { invoke, provider } = env;
+
+  try {
     await mkdir(join(env.dir, 'commands'));
     await cp('examples/commands/brief.yaml', join(env.dir, 'commands/brief.yaml'));
     expect((await invoke(['commands', 'validate', 'brief'])).valid).toBe(true);
@@ -88,8 +95,17 @@ test('packaged management lifecycle and discovery', async () => {
     expect(named.code, named.err).toBe(0);
     expect(named.out.trim()).toBe('Mina owns the fix.');
     expect(provider.requests[0].messages[0].content).toContain('10');
-    const extension = join(env.dir, 'greeting');
+  } finally {
+    await env.close();
+  }
+}, 30000);
 
+test('packaged extension lifecycle preserves its source', async () => {
+  const env = await managementSandbox();
+  const { invoke } = env;
+  const extension = join(env.dir, 'greeting');
+
+  try {
     await invoke(['extensions', 'scaffold', extension]);
     await invoke(['extensions', 'check', extension]);
     expect((await invoke(['extensions', 'test', extension])).failed).toBe(0);
@@ -100,6 +116,42 @@ test('packaged management lifecycle and discovery', async () => {
     expect(await readFile(join(extension, 'index.ts'), 'utf8')).toContain('defineCommand');
   } finally {
     await env.close();
-    provider.close();
   }
 }, 30000);
+
+async function managementSandbox() {
+  const provider = mockProvider();
+
+  try {
+    const env = await sandbox(provider.config);
+    const invoke = async (args: string[]) => {
+      const separator = args.indexOf('--');
+      const result = await env.run(
+        separator < 0 ? [...args, '--json'] : [...args.slice(0, separator), '--json', ...args.slice(separator)],
+      );
+
+      expect(result.code, result.err).toBe(0);
+      const value = JSON.parse(result.out);
+
+      expect(value.schemaVersion).toBe(1);
+
+      return value;
+    };
+
+    return {
+      ...env,
+      provider,
+      invoke,
+      async close() {
+        try {
+          await env.close();
+        } finally {
+          provider.close();
+        }
+      },
+    };
+  } catch (error) {
+    provider.close();
+    throw error;
+  }
+}
