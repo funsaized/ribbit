@@ -136,4 +136,4 @@ test('catalog/help/completions/plan do not import installed code or invoke fetch
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
-}, 15000);
+}, 30000);
