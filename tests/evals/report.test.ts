@@ -296,6 +296,113 @@ test('fixture diagnostics remain inert descriptors, including absent and truncat
   expect(render({ schemaVersion: 1, passed: 1, failed: 0, results })).toContain('Recorded fixture totals disagree');
 });
 
+test('passing fixtures with failure diagnostics warn without changing recorded verdicts', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'ribbit-report-conflicts-'));
+  const diagnostics = [
+    {
+      kind: 'value-mismatch',
+      path: '',
+      expected: { type: 'number', preview: '2', truncated: false },
+      actual: { type: 'number', preview: '3', truncated: false },
+    },
+    { kind: 'error-mismatch', expected: { outcome: 'error', code: 2 }, actual: { outcome: 'return' } },
+    ...['execution-failure', 'fixture-json', 'diagnostic-unavailable'].map((kind) => ({ kind })),
+  ];
+
+  try {
+    const path = join(dir, 'report.json');
+
+    for (const diagnostic of diagnostics) {
+      const raw = JSON.stringify({
+        schemaVersion: 1,
+        passed: 1,
+        failed: 0,
+        results: [{ file: 'synthetic.json', pass: true, diagnostic }],
+      });
+
+      await writeFile(path, raw);
+      const result = await cli(dir, [path]);
+
+      expect(result.code).toBe(0);
+      expect(result.err).toBe('');
+      expect(result.out).toContain('Recorded acceptance: pass');
+      expect(result.out).toContain('pass=1 fail=0');
+      expect(result.out).toContain('PASS "synthetic.json"');
+      expect(result.out).toContain('Acceptance evidence: not established or inconsistent');
+      expect(result.out).toContain('Warning: A recorded passing result contains a failure diagnostic.');
+      expect(result.out).toContain(`diagnostic: "${diagnostic.kind}"`);
+      expect(await readFile(path, 'utf8')).toBe(raw);
+    }
+    const expectedError = render({
+      schemaVersion: 1,
+      passed: 1,
+      failed: 0,
+      results: [{ file: 'expected-error.json', pass: true, error: 2, message: 'Expected rejection' }],
+    });
+
+    expect(expectedError).toContain('Recorded acceptance: pass');
+    expect(expectedError).toContain('Acceptance evidence: fixture contract only');
+    expect(expectedError).toContain('error: 2');
+    expect(expectedError).not.toContain('Warning:');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test.skipIf(process.platform === 'win32')(
+  'nonregular report inputs cannot block open; regular-file symlinks work',
+  async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'ribbit-report-fifo-'));
+
+    try {
+      const raw = JSON.stringify(report());
+
+      await writeFile(join(dir, 'report.json'), raw);
+      // Python supervises each CLI process so a blocked open cannot outlive the regression test.
+      const child = Bun.spawn(
+        [
+          'python3',
+          '-c',
+          `
+import json, os, subprocess, sys
+os.mkfifo('fifo')
+os.symlink('fifo', 'fifo-link')
+os.symlink('report.json', 'report-link')
+results = []
+for path in ['fifo', 'fifo-link', '.', '/dev/null', 'report-link']:
+    result = subprocess.run([sys.argv[1], sys.argv[2], path], capture_output=True, text=True, timeout=3)
+    results.append(dict(path=path, code=result.returncode, out=result.stdout, err=result.stderr))
+print(json.dumps(results))
+`,
+          process.execPath,
+          script,
+        ],
+        { cwd: dir, stdout: 'pipe', stderr: 'pipe', env: { PATH: process.env.PATH, HOME: dir } },
+      );
+      const [out, err, code] = await Promise.all([
+        new Response(child.stdout).text(),
+        new Response(child.stderr).text(),
+        child.exited,
+      ]);
+
+      expect(code, err).toBe(0);
+      const results = JSON.parse(out) as { path: string; code: number; out: string; err: string }[];
+
+      expect(results).toHaveLength(5);
+      for (const result of results.slice(0, 4)) {
+        expect(result.code, result.path).toBe(2);
+        expect(result.out).toBe('');
+        expect(result.err).toBe('eval:report: Input must be a regular report file\n');
+      }
+      expect(results[4]).toEqual({ path: 'report-link', code: 0, out: renderReport(raw, 'report-link'), err: '' });
+      expect(await readFile(join(dir, 'report.json'), 'utf8')).toBe(raw);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  },
+  10000,
+);
+
 test('bounded previews escape every display boundary without splitting Unicode', () => {
   const hostile = '\u001b]8;;https://example.test\u0007\r\n\u009b\u202e\u2066\ud800';
   const value = {

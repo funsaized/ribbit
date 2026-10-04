@@ -1,4 +1,5 @@
 import { open, writeFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
@@ -250,6 +251,8 @@ export function renderReport(raw: string, source = 'REPORT.json'): string {
     warnings.add('Recorded pass and status disagree.');
   for (const row of entries) {
     counts[state(row, legacy)]++;
+    if (state(row, legacy) === 'pass' && row.diagnostic)
+      warnings.add('A recorded passing result contains a failure diagnostic.');
     if (!legacy && !row.criteria?.length) warnings.add('One or more attempts lack criterion evidence.');
     if (!legacy && row.status === undefined) warnings.add('One or more attempts lack a recorded status.');
     if (
@@ -502,7 +505,8 @@ export function renderReport(raw: string, source = 'REPORT.json'): string {
 }
 
 async function readReport(path: string): Promise<string> {
-  const file = await open(path, 'r');
+  // Nonblocking open prevents a writerless FIFO from hanging before descriptor validation.
+  const file = await open(path, constants.O_RDONLY | (process.platform === 'win32' ? 0 : constants.O_NONBLOCK));
 
   try {
     if (!(await file.stat()).isFile()) throw new ReportError('Input must be a regular report file');
